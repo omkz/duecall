@@ -93,6 +93,7 @@ RSpec.describe "Call attempts", type: :request do
 
   describe "POST /invoices/:invoice_id/call_attempts" do
     let(:calle_client) { instance_double(Calle::Client) }
+    let(:accepted_response) { { "id" => "call_task_123", "status" => "queued", "object" => "call_task" } }
 
     before do
       invoice.update!(due_on: Date.current - 1.day, status: :open)
@@ -176,6 +177,54 @@ RSpec.describe "Call attempts", type: :request do
       end.not_to change(CallAttempt, :count)
 
       expect(response).to have_http_status(:not_found)
+    end
+
+    it "does not create or dispatch a second call while one is pending" do
+      expect(calle_client).to receive(:create_call).once.and_return(accepted_response)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.to change(invoice.call_attempts, :count).by(1)
+
+      active_call_attempt = invoice.call_attempts.active.first
+      expect(response).to redirect_to(call_attempt_path(active_call_attempt))
+
+      follow_redirect!
+      expect(response.body).to include("A follow-up call is already in progress for this invoice")
+    end
+
+    it "does not create or dispatch another call while one is in progress" do
+      active_call_attempt = invoice.call_attempts.create!(contact: contact, status: :in_progress)
+      expect(calle_client).not_to receive(:create_call)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to redirect_to(call_attempt_path(active_call_attempt))
+    end
+
+    it "allows a retry after a failed call" do
+      invoice.call_attempts.create!(contact: contact, status: :failed)
+      expect(calle_client).to receive(:create_call).once.and_return(accepted_response)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.to change(invoice.call_attempts, :count).by(1)
+
+      expect(invoice.call_attempts.order(:id).last).to be_pending
+    end
+
+    it "allows another follow-up after a completed call" do
+      invoice.call_attempts.create!(contact: contact, status: :completed)
+      expect(calle_client).to receive(:create_call).once.and_return(accepted_response)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.to change(invoice.call_attempts, :count).by(1)
+
+      expect(invoice.call_attempts.order(:id).last).to be_pending
     end
 
     it "rejects a contact from another customer" do

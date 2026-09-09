@@ -47,4 +47,17 @@ RSpec.describe Customer, type: :model do
 
     expect(Invoice.exists?(invoice.id)).to be(false)
   end
+
+  it "destroys invoices and contacts when call history exists" do
+    customer = user.customers.create!(name: "Acme")
+    contact = customer.contacts.create!(name: "Rina", phone_number: "+628123456789")
+    invoice = customer.invoices.create!(number: "INV-001", amount_cents: 12_500, due_on: Date.current)
+    call_attempt = invoice.call_attempts.create!(contact: contact)
+
+    expect { customer.destroy! }.to change(described_class, :count).by(-1)
+
+    expect(Invoice.exists?(invoice.id)).to be(false)
+    expect(CallAttempt.exists?(call_attempt.id)).to be(false)
+    expect(Contact.exists?(contact.id)).to be(false)
+  end
 end

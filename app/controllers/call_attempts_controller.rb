@@ -21,7 +21,21 @@ class CallAttemptsController < ApplicationController
       return
     end
 
-    @call_attempt = @invoice.call_attempts.create!(contact: contact)
+    created = false
+    @invoice.with_lock do
+      @call_attempt = @invoice.call_attempts.active.first
+
+      unless @call_attempt
+        @call_attempt = @invoice.call_attempts.create!(contact: contact)
+        created = true
+      end
+    end
+
+    unless created
+      redirect_to @call_attempt, notice: "A follow-up call is already in progress for this invoice."
+      return
+    end
+
     response = Calle::Client.new.create_call(
       payload: call_payload(contact),
       idempotency_key: "duecall-call-attempt-#{@call_attempt.id}"

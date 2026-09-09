@@ -26,6 +26,8 @@ class CallAttempt < ApplicationRecord
   validates :status, presence: true
   validate :contact_belongs_to_invoice_customer
 
+  scope :active, -> { where(status: %i[ pending in_progress ]) }
+
   private
     def contact_belongs_to_invoice_customer
       return if invoice.blank? || contact.blank?
