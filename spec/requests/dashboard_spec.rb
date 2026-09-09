@@ -111,7 +111,7 @@ RSpec.describe "Dashboard", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body.at_css("#overdue-count").text).to eq("2")
       expect(response.parsed_body.at_css("#active-call-count").text).to eq("2")
-      expect(response.parsed_body.at_css("#payment-promise-count").text).to eq("1")
+      expect(response.parsed_body.at_css("#payment-promise-count").text).to eq("0")
       expect(response.body).to include("USD 12,500.00", "EUR 4,200.00")
       expect(response.body).to include("VISIBLE-USD", "VISIBLE-EUR", "Newest visible activity", "Resend invoice")
       expect(response.body).not_to include("Review dispute")
@@ -119,6 +119,98 @@ RSpec.describe "Dashboard", type: :request do
       expect(action_queue).not_to include("PAID-OLD", "CANCELLED-OLD", "NOT-DUE")
       expect(response.body).not_to include("Private customer", "PRIVATE-INVOICE", "Private activity", "USD 99,999.00")
       expect(response.body.index(latest_attempt.summary)).to be < response.body.index("Future promise activity")
+    end
+
+    it "counts only current or future promises on the user's open overdue invoices" do
+      customer = user.customers.create!(name: "Acme")
+      contact = customer.contacts.create!(name: "Rina", phone_number: "+628123456789")
+
+      future_promise = customer.invoices.create!(
+        number: "OVERDUE-FUTURE-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 5.days
+      )
+      current_promise = customer.invoices.create!(
+        number: "OVERDUE-CURRENT-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 4.days
+      )
+      expired_promise = customer.invoices.create!(
+        number: "OVERDUE-EXPIRED-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 3.days
+      )
+      not_overdue = customer.invoices.create!(
+        number: "FUTURE-INVOICE-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current + 1.day
+      )
+      paid_invoice = customer.invoices.create!(
+        number: "PAID-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 2.days,
+        status: :paid
+      )
+      cancelled_invoice = customer.invoices.create!(
+        number: "CANCELLED-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 2.days,
+        status: :cancelled
+      )
+
+      future_promise.call_attempts.create!(
+        contact: contact,
+        status: :completed,
+        outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current + 2.days
+      )
+      current_promise.call_attempts.create!(
+        contact: contact,
+        status: :completed,
+        outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current
+      )
+      expired_promise.call_attempts.create!(
+        contact: contact,
+        status: :completed,
+        outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current + 3.days,
+        created_at: 2.hours.ago
+      )
+      expired_promise.call_attempts.create!(
+        contact: contact,
+        status: :completed,
+        outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current - 1.day,
+        created_at: 1.hour.ago
+      )
+      [ not_overdue, paid_invoice, cancelled_invoice ].each do |invoice|
+        invoice.call_attempts.create!(
+          contact: contact,
+          status: :completed,
+          outcome: :promised_to_pay,
+          promise_to_pay_on: Date.current + 2.days
+        )
+      end
+
+      other_user = User.create!(email_address: "other-promises@example.com", password: "password")
+      other_customer = other_user.customers.create!(name: "Other customer")
+      other_contact = other_customer.contacts.create!(name: "Other contact", phone_number: "+628111111111")
+      other_invoice = other_customer.invoices.create!(
+        number: "OTHER-PROMISE",
+        amount_cents: 10_000,
+        due_on: Date.current - 1.day
+      )
+      other_invoice.call_attempts.create!(
+        contact: other_contact,
+        status: :completed,
+        outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current + 2.days
+      )
+
+      get root_path
+
+      expect(response.parsed_body.at_css("#payment-promise-count").text).to eq("2")
     end
 
     it "highlights an expired payment promise without changing the invoice status" do

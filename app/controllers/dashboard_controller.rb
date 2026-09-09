@@ -8,7 +8,7 @@ class DashboardController < ApplicationController
     @overdue_totals = overdue_invoices.group(:currency).sum(:amount_cents)
     @active_call_count = CallAttempt.active.where(invoice: owned_invoices).count
     @latest_call_attempts = latest_call_attempts(owned_invoices)
-    @payment_promise_count = @latest_call_attempts.values.count do |call_attempt|
+    @payment_promise_count = latest_call_attempts(overdue_invoices).values.count do |call_attempt|
       call_attempt.promised_to_pay? && call_attempt.promise_to_pay_on.present? &&
         call_attempt.promise_to_pay_on >= Date.current
     end
