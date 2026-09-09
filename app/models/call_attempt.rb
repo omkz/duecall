@@ -19,7 +19,8 @@ class CallAttempt < ApplicationRecord
     refused: 6,
     no_answer: 7,
     wrong_contact: 8,
-    human_followup_required: 9
+    human_followup_required: 9,
+    unknown: 10
   }
 
   validates :status, presence: true

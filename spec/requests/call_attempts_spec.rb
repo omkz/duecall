@@ -90,4 +90,187 @@ RSpec.describe "Call attempts", type: :request do
     get invoice_path(invoice)
     expect(response.body).not_to include("Private call history", "Private contact", "PRIVATE-INV")
   end
+
+  describe "POST /invoices/:invoice_id/call_attempts" do
+    let(:calle_client) { instance_double(Calle::Client) }
+
+    before do
+      invoice.update!(due_on: Date.current - 1.day, status: :open)
+      allow(Calle::Client).to receive(:new).and_return(calle_client)
+    end
+
+    it "starts a provider-backed call with the expected payload" do
+      allow(calle_client).to receive(:create_call) do |payload:, idempotency_key:|
+        expect(payload[:recipients]).to eq([ { phones: [ contact.phone_number ] } ])
+        expect(payload[:task]).to include(
+          "AI assistant",
+          invoice.number,
+          "USD 125.00",
+          invoice.due_on.iso8601,
+          "payment status",
+          "human follow-up"
+        )
+        expect(payload[:result_schema]).to eq(
+          type: "object",
+          properties: {
+            outcome: {
+              type: "string",
+              enum: CallAttempt.outcomes.keys,
+              description: "The clearest supported payment follow-up outcome from the call evidence. Use unknown when the evidence is insufficient."
+            },
+            reason: {
+              type: "string",
+              description: "Short explanation of why payment is delayed or what happened during the call."
+            },
+            promise_to_pay_on: {
+              type: "string",
+              description: "Payment date explicitly committed to by the recipient, preferably YYYY-MM-DD. Omit when no clear date was committed."
+            },
+            sentiment: {
+              type: "string",
+              enum: %w[ positive neutral negative unknown ],
+              description: "Overall recipient sentiment during the payment discussion."
+            }
+          },
+          required: [ "outcome" ],
+          additionalProperties: false
+        )
+        expect(payload[:metadata]).to eq(
+          call_attempt_id: CallAttempt.last.id.to_s,
+          invoice_id: invoice.id.to_s
+        )
+        expect(payload[:metadata].to_json).not_to include(customer.name, contact.phone_number)
+        expect(idempotency_key).to eq("duecall-call-attempt-#{CallAttempt.last.id}")
+
+        { "id" => "call_task_123", "status" => "queued", "object" => "call_task" }
+      end
+
+      get invoice_path(invoice)
+      expect(response.body).to include("Follow up by phone", contact.name, contact.phone_number, "Start follow-up call")
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.to change(invoice.call_attempts, :count).by(1)
+
+      call_attempt = invoice.call_attempts.last
+      expect(call_attempt.contact).to eq(contact)
+      expect(call_attempt.provider_call_id).to eq("call_task_123")
+      expect(call_attempt).to be_pending
+      expect(call_attempt.raw_result).to include("id" => "call_task_123")
+      expect(response).to redirect_to(call_attempt_path(call_attempt))
+    end
+
+    it "rejects another user's invoice" do
+      other_customer = other_user.customers.create!(name: "Private customer")
+      other_contact = other_customer.contacts.create!(name: "Private contact", phone_number: "+628111111111")
+      other_invoice = other_customer.invoices.create!(
+        number: "PRIVATE-INV",
+        amount_cents: 20_000,
+        due_on: Date.current - 1.day
+      )
+
+      expect(calle_client).not_to receive(:create_call)
+
+      expect do
+        post invoice_call_attempts_path(other_invoice), params: { contact_id: other_contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a contact from another customer" do
+      other_customer = user.customers.create!(name: "Another customer")
+      other_contact = other_customer.contacts.create!(name: "Budi", phone_number: "+628111111111")
+      expect(calle_client).not_to receive(:create_call)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: other_contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a non-overdue invoice" do
+      invoice.update!(due_on: Date.current + 1.day)
+      expect(calle_client).not_to receive(:create_call)
+
+      get invoice_path(invoice)
+      expect(response.body).not_to include("Start follow-up call")
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to redirect_to(invoice_path(invoice))
+    end
+
+    it "explains that an overdue invoice needs a contact" do
+      contact.destroy!
+
+      get invoice_path(invoice)
+
+      expect(response.body).to include("Add a contact with a valid phone number", "Add contact")
+      expect(response.body).not_to include("Start follow-up call")
+    end
+
+    it "rejects a contact whose stored phone number is invalid" do
+      contact.update_column(:phone_number, "0812 3456 789")
+      expect(calle_client).not_to receive(:create_call)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to redirect_to(invoice_path(invoice))
+    end
+
+    it "rejects a paid invoice" do
+      invoice.update!(status: :paid)
+      expect(calle_client).not_to receive(:create_call)
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to redirect_to(invoice_path(invoice))
+    end
+
+    it "marks the CallAttempt failed when CALL-E rejects the request" do
+      allow(calle_client).to receive(:create_call).and_raise(
+        Calle::Error.new(
+          "CALL-E request failed.",
+          details: { "error" => "api_error", "http_status" => 422 }
+        )
+      )
+
+      expect do
+        post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+      end.to change(invoice.call_attempts, :count).by(1)
+
+      call_attempt = invoice.call_attempts.last
+      expect(call_attempt).to be_failed
+      expect(call_attempt.raw_result).to eq("error" => "api_error", "http_status" => 422)
+
+      follow_redirect!
+      expect(response.body).to include("CALL-E could not start the call")
+    end
+
+    it "fails safely without making a request when the API key is missing" do
+      original_api_key = ENV.delete("CALLE_API_KEY")
+      allow(Calle::Client).to receive(:new).and_call_original
+      expect(Net::HTTP).not_to receive(:start)
+
+      post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+
+      call_attempt = invoice.call_attempts.last
+      expect(call_attempt).to be_failed
+      expect(call_attempt.raw_result).to eq("error" => "missing_api_key")
+
+      follow_redirect!
+      expect(response.body).to include("CALL-E is not configured")
+      expect(response.body).not_to include("CALLE_API_KEY", "Authorization", "Bearer")
+    ensure
+      ENV["CALLE_API_KEY"] = original_api_key if original_api_key
+    end
+  end
 end

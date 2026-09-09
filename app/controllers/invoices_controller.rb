@@ -10,6 +10,7 @@ class InvoicesController < ApplicationController
 
   def show
     @call_attempts = @invoice.call_attempts.includes(:contact).order(created_at: :desc)
+    @contacts = @customer.contacts.order(:name)
   end
 
   def new
