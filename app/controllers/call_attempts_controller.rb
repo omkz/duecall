@@ -64,7 +64,7 @@ class CallAttemptsController < ApplicationController
     end
 
     def call_payload(contact)
-      {
+      payload = {
         task: call_task,
         recipients: [ { phones: [ contact.phone_number ] } ],
         result_schema: result_schema,
@@ -73,6 +73,9 @@ class CallAttemptsController < ApplicationController
           invoice_id: @invoice.id.to_s
         }
       }
+
+      payload[:webhook_url] = ENV["CALLE_WEBHOOK_URL"] if ENV["CALLE_WEBHOOK_URL"].present?
+      payload
     end
 
     def call_task

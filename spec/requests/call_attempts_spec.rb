@@ -161,6 +161,22 @@ RSpec.describe "Call attempts", type: :request do
       expect(response).to redirect_to(call_attempt_path(call_attempt))
     end
 
+    it "includes the configured terminal webhook URL" do
+      original_webhook_url = ENV["CALLE_WEBHOOK_URL"]
+      ENV["CALLE_WEBHOOK_URL"] = "https://duecall.example/webhooks/calle"
+
+      expect(calle_client).to receive(:create_call) do |payload:, **|
+        expect(payload[:webhook_url]).to eq("https://duecall.example/webhooks/calle")
+        accepted_response
+      end
+
+      post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+
+      expect(response).to have_http_status(:redirect)
+    ensure
+      ENV["CALLE_WEBHOOK_URL"] = original_webhook_url
+    end
+
     it "rejects another user's invoice" do
       other_customer = other_user.customers.create!(name: "Private customer")
       other_contact = other_customer.contacts.create!(name: "Private contact", phone_number: "+628111111111")

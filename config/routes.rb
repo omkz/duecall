@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  namespace :webhooks do
+    post :calle, to: "calle#create"
+  end
+
   resource :session
   resources :passwords, param: :token
   resources :call_attempts, only: :show
