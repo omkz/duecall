@@ -29,4 +29,13 @@ RSpec.describe Customer, type: :model do
     expect(customer).not_to be_valid
     expect(customer.errors[:email]).to include("is invalid")
   end
+
+  it "destroys associated contacts" do
+    customer = user.customers.create!(name: "Acme")
+    contact = customer.contacts.create!(name: "Rina", phone_number: "+628123456789")
+
+    customer.destroy!
+
+    expect(Contact.exists?(contact.id)).to be(false)
+  end
 end
