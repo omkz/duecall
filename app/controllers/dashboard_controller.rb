@@ -4,18 +4,19 @@ class DashboardController < ApplicationController
     overdue_invoices = owned_invoices.overdue
 
     @customer_count = Current.user.customers.count
-    @overdue_count = overdue_invoices.count
     @overdue_totals = overdue_invoices.group(:currency).sum(:amount_cents)
+    overdue_invoice_records = overdue_invoices.includes(:customer).to_a
+    @overdue_count = overdue_invoice_records.size
     @active_call_count = CallAttempt.active.where(invoice: owned_invoices).count
     @latest_call_attempts = latest_call_attempts(owned_invoices)
-    overdue_invoice_ids = overdue_invoices.ids.index_with(true)
+    overdue_invoice_ids = overdue_invoice_records.map(&:id).index_with(true)
     @payment_promise_count = @latest_call_attempts.values.count do |call_attempt|
       overdue_invoice_ids.key?(call_attempt.invoice_id) &&
         call_attempt.promised_to_pay? && call_attempt.promise_to_pay_on.present? &&
         call_attempt.promise_to_pay_on >= Date.current
     end
 
-    @action_queue = overdue_invoices.includes(:customer).to_a.sort_by do |invoice|
+    @action_queue = overdue_invoice_records.sort_by do |invoice|
       call_attempt = @latest_call_attempts[invoice.id]
       [ action_priority(invoice, call_attempt), -((Date.current - invoice.due_on).to_i), invoice.id ]
     end
