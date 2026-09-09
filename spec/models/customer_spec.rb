@@ -38,4 +38,13 @@ RSpec.describe Customer, type: :model do
 
     expect(Contact.exists?(contact.id)).to be(false)
   end
+
+  it "destroys associated invoices" do
+    customer = user.customers.create!(name: "Acme")
+    invoice = customer.invoices.create!(number: "INV-001", amount_cents: 12_500, due_on: Date.current)
+
+    customer.destroy!
+
+    expect(Invoice.exists?(invoice.id)).to be(false)
+  end
 end

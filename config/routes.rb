@@ -1,8 +1,10 @@
 Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
+  resources :invoices, only: :index
   resources :customers do
     resources :contacts, except: :index, shallow: true
+    resources :invoices, except: :index, shallow: true
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

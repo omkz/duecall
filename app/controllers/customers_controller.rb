@@ -7,6 +7,7 @@ class CustomersController < ApplicationController
 
   def show
     @contacts = @customer.contacts.order(:name)
+    @invoices = @customer.invoices.order(:due_on, :number)
   end
 
   def new

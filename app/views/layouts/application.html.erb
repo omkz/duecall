@@ -26,8 +26,12 @@
   <body class="min-h-screen bg-slate-50 text-slate-900">
     <% if authenticated? %>
       <header class="border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <%= link_to "DueCall", root_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
+        <div class="mx-auto flex max-w-5xl items-center gap-6 px-5 py-4">
+          <%= link_to "DueCall", root_path, class: "mr-auto text-lg font-semibold tracking-tight text-slate-950" %>
+          <nav class="flex items-center gap-4" aria-label="Main navigation">
+            <%= link_to "Customers", customers_path, class: "text-sm font-medium text-slate-600 hover:text-slate-950" %>
+            <%= link_to "Invoices", invoices_path, class: "text-sm font-medium text-slate-600 hover:text-slate-950" %>
+          </nav>
           <%= button_to "Sign out", session_path, method: :delete, class: "text-sm font-medium text-slate-600 hover:text-slate-950" %>
         </div>
       </header>

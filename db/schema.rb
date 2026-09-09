@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_191000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_193000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -35,6 +35,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_191000) do
     t.index ["user_id"], name: "index_customers_on_user_id"
   end
 
+  create_table "invoices", force: :cascade do |t|
+    t.bigint "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.string "currency", default: "USD", null: false
+    t.bigint "customer_id", null: false
+    t.date "due_on", null: false
+    t.string "external_id"
+    t.date "issued_on"
+    t.string "number", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_id", "number"], name: "index_invoices_on_customer_id_and_number", unique: true
+    t.index ["customer_id"], name: "index_invoices_on_customer_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -54,5 +69,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_191000) do
 
   add_foreign_key "contacts", "customers"
   add_foreign_key "customers", "users"
+  add_foreign_key "invoices", "customers"
   add_foreign_key "sessions", "users"
 end
