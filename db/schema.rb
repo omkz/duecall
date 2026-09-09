@@ -10,9 +10,29 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_193000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_203000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "call_attempts", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "invoice_id", null: false
+    t.integer "outcome"
+    t.date "promise_to_pay_on"
+    t.string "provider_call_id"
+    t.jsonb "raw_result", default: {}, null: false
+    t.text "reason"
+    t.string "sentiment"
+    t.datetime "started_at"
+    t.integer "status", default: 0, null: false
+    t.text "summary"
+    t.text "transcript"
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_call_attempts_on_contact_id"
+    t.index ["invoice_id"], name: "index_call_attempts_on_invoice_id"
+  end
 
   create_table "contacts", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -67,6 +87,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_193000) do
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  add_foreign_key "call_attempts", "contacts"
+  add_foreign_key "call_attempts", "invoices"
   add_foreign_key "contacts", "customers"
   add_foreign_key "customers", "users"
   add_foreign_key "invoices", "customers"

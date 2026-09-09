@@ -42,6 +42,51 @@
   <% end %>
 </dl>
 
-<div class="mt-8 border-t border-slate-200 pt-6">
+<section class="mt-10">
+  <div>
+    <h2 class="text-xl font-bold tracking-tight text-slate-950">Call history</h2>
+    <p class="mt-1 text-sm text-slate-500">Follow-up calls made for this invoice.</p>
+  </div>
+
+  <% if @call_attempts.any? %>
+    <div class="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <ul class="divide-y divide-slate-200">
+        <% @call_attempts.each do |call_attempt| %>
+          <li>
+            <%= link_to call_attempt, class: "block px-5 py-4 hover:bg-slate-50" do %>
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="font-semibold text-slate-900"><%= call_attempt.contact.name %></p>
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"><%= call_attempt.status.humanize %></span>
+                    <% if call_attempt.outcome.present? %>
+                      <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"><%= call_attempt.outcome.humanize %></span>
+                    <% end %>
+                  </div>
+                  <p class="mt-1 text-sm text-slate-500"><%= call_attempt.contact.phone_number %></p>
+                  <% if call_attempt.promise_to_pay_on.present? %>
+                    <p class="mt-2 text-sm font-medium text-emerald-700">Promised payment by <%= call_attempt.promise_to_pay_on.to_fs(:long) %></p>
+                  <% end %>
+                  <% if call_attempt.summary.present? %>
+                    <p class="mt-2 line-clamp-2 text-sm text-slate-600"><%= call_attempt.summary %></p>
+                  <% end %>
+                  <p class="mt-2 text-xs text-slate-400"><%= (call_attempt.started_at || call_attempt.created_at).to_fs(:long) %></p>
+                </div>
+                <span aria-hidden="true" class="text-slate-400">&rarr;</span>
+              </div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% else %>
+    <div class="mt-5 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+      <h3 class="font-semibold text-slate-900">No calls yet</h3>
+      <p class="mx-auto mt-2 max-w-md text-sm text-slate-500">Calls will appear here after DueCall follows up with the customer.</p>
+    </div>
+  <% end %>
+</section>
+
+<div class="mt-10 border-t border-slate-200 pt-6">
   <%= button_to "Delete invoice", @invoice, method: :delete, class: "text-sm font-medium text-red-600 hover:text-red-500", form: { data: { turbo_confirm: "Delete this invoice?" } } %>
 </div>

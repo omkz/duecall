@@ -1,5 +1,6 @@
 class Invoice < ApplicationRecord
   belongs_to :customer
+  has_many :call_attempts, dependent: :destroy
 
   enum :status, {
     open: 0,

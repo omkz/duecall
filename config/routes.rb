@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
+  resources :call_attempts, only: :show
   resources :invoices, only: :index
   resources :customers do
     resources :contacts, except: :index, shallow: true

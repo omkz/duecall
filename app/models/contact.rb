@@ -2,6 +2,7 @@ class Contact < ApplicationRecord
   E164_FORMAT = /\A\+[1-9]\d{1,14}\z/
 
   belongs_to :customer
+  has_many :call_attempts, dependent: :restrict_with_error
 
   validates :name, presence: true
   validates :phone_number, presence: true
