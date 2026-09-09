@@ -1,0 +1,129 @@
+<% content_for :title, "Dashboard · DueCall" %>
+
+<div>
+  <h1 class="text-3xl font-bold tracking-tight text-slate-950">Accounts receivable</h1>
+  <p class="mt-1 text-sm text-slate-500">See what needs attention across your customers.</p>
+</div>
+
+<% if @customer_count.zero? %>
+  <div class="mt-8 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+    <h2 class="text-lg font-semibold text-slate-900">Start tracking receivables</h2>
+    <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500">Add a customer, then add invoices and contacts to begin following up.</p>
+    <%= link_to "Add your first customer", new_customer_path, class: "mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
+  </div>
+<% else %>
+  <section aria-label="Summary" class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-sm font-medium text-slate-500">Overdue invoices</p>
+      <p id="overdue-count" class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @overdue_count %></p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-sm font-medium text-slate-500">Overdue amount</p>
+      <% if @overdue_totals.any? %>
+        <div class="mt-2 space-y-1">
+          <% @overdue_totals.sort.each do |currency, amount_cents| %>
+            <p class="text-lg font-bold tracking-tight text-slate-950"><%= format_money(amount_cents, currency) %></p>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950">0</p>
+      <% end %>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-sm font-medium text-slate-500">Active calls</p>
+      <p id="active-call-count" class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @active_call_count %></p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p class="text-sm font-medium text-slate-500">Payment promises</p>
+      <p id="payment-promise-count" class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @payment_promise_count %></p>
+    </div>
+  </section>
+
+  <section class="mt-10">
+    <div>
+      <h2 class="text-xl font-bold tracking-tight text-slate-950">Action queue</h2>
+      <p class="mt-1 text-sm text-slate-500">Open overdue invoices ordered by what needs attention first.</p>
+    </div>
+
+    <% if @action_queue.any? %>
+      <div id="action-queue" class="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <ul class="divide-y divide-slate-200">
+          <% @action_queue.each do |invoice| %>
+            <% call_attempt = @latest_call_attempts[invoice.id] %>
+            <% missed_promise = missed_payment_promise?(invoice, call_attempt) %>
+            <li class="px-5 py-5 <%= "bg-amber-50" if missed_promise %>">
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <%= link_to invoice.number, invoice, class: "font-semibold text-blue-600 hover:text-blue-500" %>
+                    <span class="text-sm text-slate-500"><%= invoice.customer.name %></span>
+                    <% if missed_promise %>
+                      <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Missed promise</span>
+                    <% end %>
+                  </div>
+                  <p class="mt-1 text-sm text-slate-700"><%= format_money(invoice.amount_cents, invoice.currency) %> · <%= pluralize((Date.current - invoice.due_on).to_i, "day") %> overdue</p>
+                  <% if call_attempt&.outcome.present? %>
+                    <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Latest outcome: <%= call_attempt.outcome.humanize %></p>
+                  <% end %>
+                  <% if call_attempt&.promise_to_pay_on.present? %>
+                    <p class="mt-1 text-sm <%= missed_promise ? "font-semibold text-amber-800" : "text-slate-600" %>">Promise to pay: <%= call_attempt.promise_to_pay_on.to_fs(:long) %></p>
+                  <% end %>
+                  <% if call_attempt&.summary.present? || call_attempt&.reason.present? %>
+                    <p class="mt-2 line-clamp-2 text-sm text-slate-600"><%= call_attempt.summary.presence || call_attempt.reason %></p>
+                  <% end %>
+                </div>
+                <div class="shrink-0 sm:text-right">
+                  <p class="text-sm font-semibold <%= missed_promise ? "text-amber-800" : "text-slate-900" %>"><%= recommended_next_action(invoice, call_attempt) %></p>
+                  <%= link_to "View invoice →", invoice, class: "mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-500" %>
+                </div>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% else %>
+      <div class="mt-5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-6 py-10 text-center">
+        <h3 class="font-semibold text-emerald-900">No overdue invoices</h3>
+        <p class="mt-2 text-sm text-emerald-700">You're all caught up.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <section class="mt-10">
+    <div>
+      <h2 class="text-xl font-bold tracking-tight text-slate-950">Recent call activity</h2>
+      <p class="mt-1 text-sm text-slate-500">The latest follow-up calls across your invoices.</p>
+    </div>
+
+    <% if @recent_call_attempts.any? %>
+      <div class="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <ul class="divide-y divide-slate-200">
+          <% @recent_call_attempts.each do |call_attempt| %>
+            <li>
+              <%= link_to call_attempt, class: "block px-5 py-4 hover:bg-slate-50" do %>
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-slate-900"><%= call_attempt.invoice.customer.name %> · <%= call_attempt.invoice.number %></p>
+                    <p class="mt-1 text-sm text-slate-500"><%= call_attempt.contact.name %></p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"><%= call_attempt.status.humanize %></span>
+                      <% if call_attempt.outcome.present? %>
+                        <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"><%= call_attempt.outcome.humanize %></span>
+                      <% end %>
+                    </div>
+                    <% if call_attempt.summary.present? %>
+                      <p class="mt-2 line-clamp-2 text-sm text-slate-600"><%= call_attempt.summary %></p>
+                    <% end %>
+                  </div>
+                  <time class="shrink-0 text-xs text-slate-400"><%= (call_attempt.started_at || call_attempt.created_at).to_fs(:short) %></time>
+                </div>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% else %>
+      <p class="mt-5 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center text-sm text-slate-500">No call activity yet.</p>
+    <% end %>
+  </section>
+<% end %>
