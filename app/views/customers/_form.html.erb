@@ -1,0 +1,34 @@
+<%= form_with model: customer, class: "space-y-6" do |form| %>
+  <% if customer.errors.any? %>
+    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p class="font-semibold">Please fix the following:</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        <% customer.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :name, class: "block text-sm font-medium text-slate-700" %>
+    <%= form.text_field :name, required: true, autofocus: true, class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
+  </div>
+
+  <div>
+    <%= form.label :email, class: "block text-sm font-medium text-slate-700" %>
+    <%= form.email_field :email, placeholder: "customer@example.com", class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
+    <p class="mt-1.5 text-xs text-slate-500">Optional</p>
+  </div>
+
+  <div>
+    <%= form.label :external_id, "External ID", class: "block text-sm font-medium text-slate-700" %>
+    <%= form.text_field :external_id, class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
+    <p class="mt-1.5 text-xs text-slate-500">Optional reference from another system</p>
+  </div>
+
+  <div class="flex items-center gap-3 border-t border-slate-200 pt-6">
+    <%= form.submit class: "cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
+    <%= link_to "Cancel", customer.persisted? ? customer_path(customer) : customers_path, class: "rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950" %>
+  </div>
+<% end %>

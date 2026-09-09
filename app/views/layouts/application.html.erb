@@ -23,8 +23,17 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+  <body class="min-h-screen bg-slate-50 text-slate-900">
+    <% if authenticated? %>
+      <header class="border-b border-slate-200 bg-white">
+        <div class="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
+          <%= link_to "DueCall", root_path, class: "text-lg font-semibold tracking-tight text-slate-950" %>
+          <%= button_to "Sign out", session_path, method: :delete, class: "text-sm font-medium text-slate-600 hover:text-slate-950" %>
+        </div>
+      </header>
+    <% end %>
+
+    <main class="mx-auto w-full max-w-5xl px-5 py-10">
       <%= yield %>
     </main>
   </body>

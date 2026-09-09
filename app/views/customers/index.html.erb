@@ -1,0 +1,37 @@
+<% content_for :title, "Customers · DueCall" %>
+
+<div class="flex items-center justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight text-slate-950">Customers</h1>
+    <p class="mt-1 text-sm text-slate-500">Keep the people you need to follow up with in one place.</p>
+  </div>
+  <%= link_to "Add customer", new_customer_path, class: "shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
+</div>
+
+<% if notice = flash[:notice] %>
+  <p class="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><%= notice %></p>
+<% end %>
+
+<% if @customers.any? %>
+  <div class="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <ul class="divide-y divide-slate-200">
+      <% @customers.each do |customer| %>
+        <li>
+          <%= link_to customer, class: "flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50" do %>
+            <div class="min-w-0">
+              <p class="truncate font-semibold text-slate-900"><%= customer.name %></p>
+              <p class="mt-1 truncate text-sm text-slate-500"><%= customer.email.presence || "No email added" %></p>
+            </div>
+            <span aria-hidden="true" class="text-slate-400">&rarr;</span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+<% else %>
+  <div class="mt-8 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+    <h2 class="text-lg font-semibold text-slate-900">No customers yet</h2>
+    <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500">Add your first customer to start keeping track of who needs a call.</p>
+    <%= link_to "Add your first customer", new_customer_path, class: "mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
+  </div>
+<% end %>

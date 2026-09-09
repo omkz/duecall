@@ -1,0 +1,11 @@
+<% content_for :title, "Add customer · DueCall" %>
+
+<div class="mx-auto max-w-xl">
+  <%= link_to "← Customers", customers_path, class: "text-sm font-medium text-slate-500 hover:text-slate-900" %>
+  <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-950">Add customer</h1>
+  <p class="mt-2 text-sm text-slate-500">Add the essentials now. You can update them later.</p>
+
+  <div class="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <%= render "form", customer: @customer %>
+  </div>
+</div>
