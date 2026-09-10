@@ -57,7 +57,7 @@ class InvoicesController < ApplicationController
     def invoice_params
       params.require(:invoice).permit(
         :number,
-        :amount_cents,
+        :amount,
         :currency,
         :issued_on,
         :due_on,

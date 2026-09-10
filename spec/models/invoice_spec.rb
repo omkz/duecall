@@ -27,6 +27,37 @@ RSpec.describe Invoice, type: :model do
     expect(invoice.errors[:amount_cents]).to include("must be greater than 0")
   end
 
+  it "converts decimal major-unit amounts to integer cents" do
+    expect(build_invoice(amount: "125").amount_cents).to eq(12_500)
+    expect(build_invoice(amount: "125.00").amount_cents).to eq(12_500)
+    expect(build_invoice(amount: "125.50").amount_cents).to eq(12_550)
+    expect(build_invoice(amount: "4800.00").amount_cents).to eq(480_000)
+    expect(build_invoice(amount: "0.01").amount_cents).to eq(1)
+  end
+
+  it "formats persisted cents as a major-unit amount" do
+    expect(build_invoice(amount_cents: 480_000).amount).to eq("4800.00")
+  end
+
+  it "rejects malformed amounts and precision beyond cents without raising" do
+    [ "abc", "12.345" ].each do |amount|
+      invoice = build_invoice(amount: amount)
+
+      expect(invoice).not_to be_valid
+      expect(invoice.errors[:amount]).to include("must be a valid amount with no more than 2 decimal places")
+      expect(invoice.amount).to eq(amount)
+    end
+  end
+
+  it "keeps zero and negative amounts invalid" do
+    zero = build_invoice(amount: "0")
+    negative = build_invoice(amount: "-5")
+
+    expect(zero).not_to be_valid
+    expect(zero.errors[:amount_cents]).to include("must be greater than 0")
+    expect(negative).not_to be_valid
+  end
+
   it "requires a due date" do
     invoice = build_invoice(due_on: nil)
 

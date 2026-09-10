@@ -17,9 +17,8 @@
 
   <div class="grid gap-6 sm:grid-cols-2">
     <div>
-      <%= form.label :amount_cents, "Amount (cents)", class: "block text-sm font-medium text-slate-700" %>
-      <%= form.number_field :amount_cents, required: true, min: 1, step: 1, placeholder: "12500", class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
-      <p class="mt-1.5 text-xs text-slate-500">Enter whole cents only; 12500 means 125.00.</p>
+      <%= form.label :amount, "Amount", class: "block text-sm font-medium text-slate-700" %>
+      <%= form.number_field :amount, required: true, min: "0.01", step: "0.01", placeholder: "125.00", class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
     </div>
     <div>
       <%= form.label :currency, class: "block text-sm font-medium text-slate-700" %>

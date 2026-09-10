@@ -25,7 +25,8 @@ RSpec.describe "Invoices", type: :request do
       post customer_invoices_path(customer), params: {
         invoice: {
           number: "INV-001",
-          amount_cents: 12_500,
+          amount: "125.00",
+          amount_cents: 999_999,
           currency: "usd",
           issued_on: Date.current,
           due_on: Date.current + 7.days,
@@ -38,6 +39,7 @@ RSpec.describe "Invoices", type: :request do
 
     invoice = customer.invoices.find_by!(number: "INV-001")
     expect(invoice.customer).to eq(customer)
+    expect(invoice.amount_cents).to eq(12_500)
     expect(invoice.currency).to eq("USD")
     expect(response).to redirect_to(invoice_path(invoice))
 
@@ -51,14 +53,17 @@ RSpec.describe "Invoices", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("INV-001", "USD 125.00", "ERP-42")
 
+    invoice.update!(amount_cents: 480_000)
     get edit_invoice_path(invoice)
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include('value="4800.00"')
 
     patch invoice_path(invoice), params: {
-      invoice: { number: "INV-UPDATED", status: "paid", customer_id: other_customer.id }
+      invoice: { number: "INV-UPDATED", amount: "4800.50", status: "paid", customer_id: other_customer.id }
     }
     expect(response).to redirect_to(invoice_path(invoice))
     expect(invoice.reload.number).to eq("INV-UPDATED")
+    expect(invoice.amount_cents).to eq(480_050)
     expect(invoice).to be_paid
     expect(invoice.customer).to eq(customer)
 
@@ -66,6 +71,43 @@ RSpec.describe "Invoices", type: :request do
       delete invoice_path(invoice)
     end.to change(customer.invoices, :count).by(-1)
     expect(response).to redirect_to(customer_path(customer))
+  end
+
+  it "stores decimal major-unit amounts as integer cents" do
+    post customer_invoices_path(customer), params: {
+      invoice: { number: "INV-DECIMAL", amount: "4800.50", due_on: Date.current }
+    }
+
+    expect(customer.invoices.find_by!(number: "INV-DECIMAL").amount_cents).to eq(480_050)
+
+    post customer_invoices_path(customer), params: {
+      invoice: { number: "INV-PENNY", amount: "0.01", due_on: Date.current }
+    }
+
+    expect(customer.invoices.find_by!(number: "INV-PENNY").amount_cents).to eq(1)
+  end
+
+  it "rejects malformed amounts and amounts more precise than cents" do
+    [ "abc", "12.345", "0", "-5" ].each do |amount|
+      expect do
+        post customer_invoices_path(customer), params: {
+          invoice: { number: "INVALID-#{amount}", amount: amount, due_on: Date.current }
+        }
+      end.not_to change(Invoice, :count)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("Please fix the following")
+    end
+  end
+
+  it "ignores direct amount_cents assignment from public params" do
+    expect do
+      post customer_invoices_path(customer), params: {
+        invoice: { number: "CENTS-ONLY", amount_cents: 50_000, due_on: Date.current }
+      }
+    end.not_to change(Invoice, :count)
+
+    expect(response).to have_http_status(:unprocessable_content)
   end
 
   it "isolates invoices belonging to another user" do
