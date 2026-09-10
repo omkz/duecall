@@ -88,8 +88,12 @@ production:
   primary: &primary_production
     <<: *default
     database: duecall_production
-    username: duecall
-    password: <%= ENV["DUECALL_DATABASE_PASSWORD"] %>
+<% if Rails.env.production? %>
+    host: <%= ENV.fetch("DATABASE_HOST") %>
+    port: <%= ENV.fetch("DATABASE_PORT", 5432) %>
+    username: <%= ENV.fetch("DATABASE_USER") %>
+    password: <%= ENV.fetch("DATABASE_PASSWORD") %>
+<% end %>
   cache:
     <<: *primary_production
     database: duecall_production_cache

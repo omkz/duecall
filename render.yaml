@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: duecall
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /up
+    envVars:
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: duecall-postgres
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: duecall-postgres
+          property: port
+      - key: DATABASE_USER
+        fromDatabase:
+          name: duecall-postgres
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: duecall-postgres
+          property: password
+      - key: RAILS_MASTER_KEY
+        sync: false
+      - key: CALLE_API_KEY
+        sync: false
+      - key: DUECALL_DEMO_PASSWORD
+        sync: false
+      - key: DUECALL_DEMO_SEED
+        value: "1"
+      - key: DUECALL_DEMO_EMAIL
+        value: demo@duecall.test
+      - key: SOLID_QUEUE_IN_PUMA
+        value: "1"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: RAILS_MAX_THREADS
+        value: "3"
+      - key: HTTP_PORT
+        value: "10000"
+      - key: TARGET_PORT
+        value: "3000"
+
+databases:
+  - name: duecall-postgres
+    databaseName: duecall_production
+    user: duecall
+    plan: free
+    region: singapore
