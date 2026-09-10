@@ -6,22 +6,10 @@ services:
     region: singapore
     healthCheckPath: /up
     envVars:
-      - key: DATABASE_HOST
+      - key: DATABASE_URL
         fromDatabase:
           name: duecall-postgres
-          property: host
-      - key: DATABASE_PORT
-        fromDatabase:
-          name: duecall-postgres
-          property: port
-      - key: DATABASE_USER
-        fromDatabase:
-          name: duecall-postgres
-          property: user
-      - key: DATABASE_PASSWORD
-        fromDatabase:
-          name: duecall-postgres
-          property: password
+          property: connectionString
       - key: RAILS_MASTER_KEY
         sync: false
       - key: CALLE_API_KEY

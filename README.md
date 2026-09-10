@@ -28,7 +28,7 @@ The [Render Blueprint](render.yaml) provisions one Docker web service and one Po
 
 The existing Docker entrypoint runs `bin/rails db:prepare` before starting Rails. On the initial deployment this creates and prepares the logical databases and loads the demo seed. On later deployments, `db:prepare` migrates existing databases without rerunning seeds against an already initialized primary database.
 
-The Blueprint supplies individual host, port, user, and password values. Do not add `DATABASE_URL`, because it would override this explicit multi-database configuration.
+The Blueprint supplies Render's internal PostgreSQL `connectionString` as `DATABASE_URL`. The Rails database configuration preserves that URL's credentials, host, port, and query parameters while replacing only its database path for each logical database.
 
 The Blueprint uses Render's free plans for an initial demo. Free Render PostgreSQL instances currently expire after 30 days, so upgrade the database plan before using this setup for persistent production data.
 
