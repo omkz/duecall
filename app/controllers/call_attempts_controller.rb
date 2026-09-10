@@ -1,6 +1,9 @@
 class CallAttemptsController < ApplicationController
   before_action :set_call_attempt, only: :show
-  before_action :set_invoice, only: :create
+  before_action :set_invoice, only: %i[ new create ]
+  before_action :ensure_invoice_overdue, only: %i[ new create ]
+  before_action :set_contact, only: %i[ new create ]
+  before_action :ensure_valid_phone, only: %i[ new create ]
 
   def show
     @invoice = @call_attempt.invoice
@@ -8,25 +11,20 @@ class CallAttemptsController < ApplicationController
     @contact = @call_attempt.contact
   end
 
+  def new
+    active_call_attempt = @invoice.call_attempts.active.first
+    if active_call_attempt
+      redirect_to active_call_attempt, notice: "A follow-up call is already in progress for this invoice."
+    end
+  end
+
   def create
-    unless @invoice.overdue?
-      redirect_to @invoice, alert: "Only overdue open invoices can be followed up by phone."
-      return
-    end
-
-    contact = @invoice.customer.contacts.find(params.require(:contact_id))
-
-    unless Contact::E164_FORMAT.match?(contact.phone_number)
-      redirect_to @invoice, alert: "The selected contact needs a valid international phone number."
-      return
-    end
-
     created = false
     @invoice.with_lock do
       @call_attempt = @invoice.call_attempts.active.first
 
       unless @call_attempt
-        @call_attempt = @invoice.call_attempts.create!(contact: contact)
+        @call_attempt = @invoice.call_attempts.create!(contact: @contact)
         created = true
       end
     end
@@ -37,7 +35,7 @@ class CallAttemptsController < ApplicationController
     end
 
     response = Calle::Client.new.create_call(
-      payload: call_payload(contact),
+      payload: call_payload(@contact),
       idempotency_key: "duecall-call-attempt-#{@call_attempt.id}"
     )
 
@@ -61,6 +59,22 @@ class CallAttemptsController < ApplicationController
 
     def set_invoice
       @invoice = Invoice.where(customer: Current.user.customers).find(params[:invoice_id])
+    end
+
+    def ensure_invoice_overdue
+      return if @invoice.overdue?
+
+      redirect_to @invoice, alert: "Only overdue open invoices can be followed up by phone."
+    end
+
+    def set_contact
+      @contact = @invoice.customer.contacts.find(params.require(:contact_id))
+    end
+
+    def ensure_valid_phone
+      return if Contact::E164_FORMAT.match?(@contact.phone_number)
+
+      redirect_to @invoice, alert: "The selected contact needs a valid international phone number."
     end
 
     def call_payload(contact)

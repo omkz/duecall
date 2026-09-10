@@ -10,7 +10,8 @@ class InvoicesController < ApplicationController
 
   def show
     @call_attempts = @invoice.call_attempts.includes(:contact).order(created_at: :desc)
-    @contacts = @customer.contacts.order(:name)
+    @active_call_attempt = @call_attempts.find { |call_attempt| call_attempt.pending? || call_attempt.in_progress? }
+    @contacts = @customer.contacts.order(:name) unless @active_call_attempt
   end
 
   def new

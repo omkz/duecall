@@ -7,7 +7,7 @@ Rails.application.routes.draw do
   resources :passwords, param: :token
   resources :call_attempts, only: :show
   resources :invoices, only: :index do
-    resources :call_attempts, only: :create
+    resources :call_attempts, only: %i[ new create ]
   end
   resources :customers do
     resources :contacts, except: :index, shallow: true

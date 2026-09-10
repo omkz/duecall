@@ -174,6 +174,115 @@ RSpec.describe "Call attempts", type: :request do
       allow(Calle::Client).to receive(:new).and_return(calle_client)
     end
 
+    it "shows a read-only call preview before approval" do
+      contact.update!(role: "Accounts Payable")
+      expect(Calle::Client).not_to receive(:new)
+
+      get invoice_path(invoice)
+      expect(response.body).to include("Review call")
+      expect(response.body).not_to include("Start follow-up call")
+      review_form = response.parsed_body.at_css(
+        "form[action='#{new_invoice_call_attempt_path(invoice)}'][method='get']"
+      )
+      expect(review_form).to be_present
+      expect(review_form.at_css("select[name='contact_id']")).to be_present
+      expect(review_form.to_html).not_to include("turbo-confirm", "invoice_id", "customer_id")
+
+      expect do
+        get new_invoice_call_attempt_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(
+        "Review call",
+        contact.name,
+        contact.role,
+        contact.phone_number,
+        customer.name,
+        invoice.number,
+        "USD 125.00",
+        "1 day overdue",
+        "Identify itself as an AI assistant",
+        "Ask what is blocking payment",
+        "Capture a promised payment date if voluntarily provided",
+        "missing invoice or PO information and disputes",
+        "Escalate ambiguous or sensitive situations for human follow-up",
+        "will not request card or bank credentials",
+        "Call Rina"
+      )
+      expect(response.body).not_to include("result_schema", "additionalProperties")
+      approval_form = response.parsed_body.at_css(
+        "form[action='#{invoice_call_attempts_path(invoice)}'][method='post']"
+      )
+      expect(approval_form).to be_present
+      expect(approval_form.at_css("input[name='contact_id'][value='#{contact.id}']")).to be_present
+      expect(approval_form.text).to include("Call Rina")
+      expect(approval_form.to_html).not_to include("invoice_id", "customer_id")
+    end
+
+    it "rejects an ineligible invoice during preview without contacting CALL-E" do
+      expect(Calle::Client).not_to receive(:new)
+
+      invoice.update!(due_on: Date.current + 1.day)
+      get new_invoice_call_attempt_path(invoice), params: { contact_id: contact.id }
+      expect(response).to redirect_to(invoice_path(invoice))
+
+      [ :paid, :cancelled ].each do |status|
+        invoice.update!(due_on: Date.current - 1.day, status: status)
+        get new_invoice_call_attempt_path(invoice), params: { contact_id: contact.id }
+        expect(response).to redirect_to(invoice_path(invoice))
+      end
+    end
+
+    it "rejects a preview contact from another customer" do
+      another_customer = user.customers.create!(name: "Another customer")
+      another_contact = another_customer.contacts.create!(name: "Budi", phone_number: "+628111111111")
+      expect(Calle::Client).not_to receive(:new)
+
+      get new_invoice_call_attempt_path(invoice), params: { contact_id: another_contact.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects a preview for another user's invoice" do
+      other_customer = other_user.customers.create!(name: "Private customer")
+      other_contact = other_customer.contacts.create!(name: "Private contact", phone_number: "+628111111111")
+      other_invoice = other_customer.invoices.create!(
+        number: "PRIVATE-PREVIEW",
+        amount_cents: 20_000,
+        due_on: Date.current - 1.day
+      )
+      expect(Calle::Client).not_to receive(:new)
+
+      get new_invoice_call_attempt_path(other_invoice), params: { contact_id: other_contact.id }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects an invalid preview phone without contacting CALL-E" do
+      contact.update_column(:phone_number, "202-555-0101")
+      expect(Calle::Client).not_to receive(:new)
+
+      get new_invoice_call_attempt_path(invoice), params: { contact_id: contact.id }
+
+      expect(response).to redirect_to(invoice_path(invoice))
+    end
+
+    it "redirects preview to an existing active call and changes the invoice action" do
+      active_call_attempt = invoice.call_attempts.create!(contact: contact, status: :in_progress)
+      expect(Calle::Client).not_to receive(:new)
+
+      get invoice_path(invoice)
+      expect(response.body).to include("Call in progress", "View active call")
+      expect(response.body).not_to include("Review call")
+
+      expect do
+        get new_invoice_call_attempt_path(invoice), params: { contact_id: contact.id }
+      end.not_to change(CallAttempt, :count)
+
+      expect(response).to redirect_to(call_attempt_path(active_call_attempt))
+    end
+
     it "starts a provider-backed call with the expected payload" do
       allow(calle_client).to receive(:create_call) do |payload:, idempotency_key:|
         expect(payload[:recipients]).to eq([ { phones: [ contact.phone_number ] } ])
@@ -221,7 +330,8 @@ RSpec.describe "Call attempts", type: :request do
       end
 
       get invoice_path(invoice)
-      expect(response.body).to include("Follow up by phone", contact.name, contact.phone_number, "Start follow-up call")
+      expect(response.body).to include("Follow up by phone", contact.name, contact.phone_number, "Review call")
+      expect(response.body).not_to include("Start follow-up call")
 
       expect do
         post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
@@ -334,7 +444,7 @@ RSpec.describe "Call attempts", type: :request do
       expect(calle_client).not_to receive(:create_call)
 
       get invoice_path(invoice)
-      expect(response.body).not_to include("Start follow-up call")
+      expect(response.body).not_to include("Review call")
 
       expect do
         post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
@@ -349,7 +459,7 @@ RSpec.describe "Call attempts", type: :request do
       get invoice_path(invoice)
 
       expect(response.body).to include("Add a contact with a valid phone number", "Add contact")
-      expect(response.body).not_to include("Start follow-up call")
+      expect(response.body).not_to include("Review call")
     end
 
     it "rejects a contact whose stored phone number is invalid" do
