@@ -13,7 +13,7 @@ RSpec.describe "Call attempts", type: :request do
     post session_path, params: { email_address: user.email_address, password: "password" }
   end
 
-  it "allows an authenticated user to view their call attempt and invoice history" do
+  it "prominently presents a completed call result and readable transcript" do
     call_attempt = invoice.call_attempts.create!(
       contact: contact,
       status: :completed,
@@ -22,7 +22,7 @@ RSpec.describe "Call attempts", type: :request do
       sentiment: "positive",
       reason: "Invoice reminder",
       summary: "Rina promised to pay this week.",
-      transcript: "Agent: Hello\nRina: I will pay this week.",
+      transcript: "Agent: Hello\nRecipient: I will pay this week.",
       raw_result: { private_provider_payload: "do not display" },
       started_at: Time.current - 5.minutes,
       completed_at: Time.current
@@ -45,11 +45,85 @@ RSpec.describe "Call attempts", type: :request do
       "INV-001",
       "Acme",
       "Rina",
+      "USD 125.00",
+      "Call completed",
+      "Outcome",
+      "Promised to pay",
       "Invoice reminder",
-      "positive",
-      "Agent: Hello"
+      "Rina promised to pay this week.",
+      "Promised payment",
+      call_attempt.promise_to_pay_on.to_fs(:long),
+      "Positive",
+      "DueCall",
+      "Customer",
+      "Hello",
+      "I will pay this week."
     )
+    expect(response.body).not_to include("Payment promise missed", "Agent: Hello", "Recipient: I will pay")
     expect(response.body).not_to include("do not display", "private_provider_payload")
+  end
+
+  it "warns only when a promised payment date has passed on an open invoice" do
+    missed_call = invoice.call_attempts.create!(
+      contact: contact,
+      status: :completed,
+      outcome: :promised_to_pay,
+      promise_to_pay_on: Date.current - 1.day
+    )
+
+    get call_attempt_path(missed_call)
+
+    expect(response.body).to include("Payment promise missed")
+
+    invoice.update!(status: :paid)
+    get call_attempt_path(missed_call)
+
+    expect(response.body).to include("Promised payment")
+    expect(response.body).not_to include("Payment promise missed")
+  end
+
+  it "shows useful waiting copy for pending and in-progress calls" do
+    [ :pending, :in_progress ].each do |status|
+      call_attempt = invoice.call_attempts.create!(contact: contact, status: status)
+
+      get call_attempt_path(call_attempt)
+
+      expect(response.body).to include(
+        status.to_s.humanize,
+        "Call in progress",
+        "DueCall is waiting for CALL-E to complete the conversation",
+        "USD 125.00"
+      )
+      expect(response.body).not_to include("Outcome", "Not available", "Reason", "Not provided")
+    end
+  end
+
+  it "shows a safe failed state without provider details" do
+    call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      status: :failed,
+      summary: "The recipient could not be reached.",
+      raw_result: { failure_message: "private provider diagnostic" }
+    )
+
+    get call_attempt_path(call_attempt)
+
+    expect(response.body).to include("Call failed", "The call could not be completed", call_attempt.summary)
+    expect(response.body).not_to include("private provider diagnostic", "failure_message")
+  end
+
+  it "escapes transcript content while mapping known speakers" do
+    call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      status: :completed,
+      outcome: :unknown,
+      transcript: "Bot: <script>alert('unsafe')</script>\nUser: Safe response"
+    )
+
+    get call_attempt_path(call_attempt)
+
+    expect(response.body).to include("DueCall", "Customer", "&lt;script&gt;alert")
+    expect(response.body).not_to include("<script>alert('unsafe')</script>")
   end
 
   it "shows call history only on the correct invoice" do
