@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_203000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -22,6 +22,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_203000) do
     t.integer "outcome"
     t.date "promise_to_pay_on"
     t.string "provider_call_id"
+    t.string "provider_goal_run_id"
     t.jsonb "raw_result", default: {}, null: false
     t.text "reason"
     t.string "sentiment"
@@ -32,6 +33,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_203000) do
     t.datetime "updated_at", null: false
     t.index ["contact_id"], name: "index_call_attempts_on_contact_id"
     t.index ["invoice_id"], name: "index_call_attempts_on_invoice_id"
+    t.index ["provider_goal_run_id"], name: "index_call_attempts_on_provider_goal_run_id", unique: true
   end
 
   create_table "contacts", force: :cascade do |t|
