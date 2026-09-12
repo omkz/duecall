@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Calle::RunGoal do
+RSpec.describe CallAttempt::CalleGoal do
   let(:user) { User.create!(email_address: "owner@example.com", password: "password") }
   let(:customer) { user.customers.create!(name: "Acme") }
   let(:invoice) do
@@ -40,7 +40,7 @@ RSpec.describe Calle::RunGoal do
       idempotency_key: "duecall:call_attempt:#{call_attempt.id}:overdue_invoice_goal:v1"
     ).and_return(provider_response)
 
-    result = described_class.call(call_attempt:, client:, goal_id: "goal_overdue")
+    result = call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
 
     expect(result).to eq(call_attempt)
     expect(call_attempt).to be_in_progress
@@ -60,7 +60,7 @@ RSpec.describe Calle::RunGoal do
     )
     allow(client).to receive(:create_goal_run).and_raise(error)
 
-    described_class.call(call_attempt:, client:, goal_id: "goal_overdue")
+    call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
 
     expect(call_attempt).to be_failed
     expect(call_attempt.provider_goal_run_id).to be_nil
@@ -78,12 +78,12 @@ RSpec.describe Calle::RunGoal do
     expect(client).not_to receive(:create_goal_run)
 
     expect do
-      described_class.call(call_attempt:, client:, goal_id: "goal_overdue")
-    end.to raise_error(Calle::RunGoal::InvalidStateError)
+      call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
+    end.to raise_error(CallAttempt::InvalidTransitionError)
   end
 
   it "marks the attempt failed when configuration is missing" do
-    described_class.call(call_attempt:, client:, goal_id: nil)
+    call_attempt.run_calle_goal!(client:, goal_id: nil)
 
     expect(call_attempt).to be_failed
     expect(call_attempt.raw_result.dig("submission_error", "error_message")).to eq(

@@ -12,10 +12,13 @@ The API key and Goal ID may instead be stored under `calle.api_key` and
 `calle.overdue_invoice_goal_id` in Rails credentials. Never expose the API key
 to browser code.
 
-`Calle::RunGoal.call(call_attempt: call_attempt)` submits one Goal Run. The
-service derives a stable idempotency key from the persisted `CallAttempt`, saves
-the public Goal Run ID in `provider_goal_run_id`, and records the provider
-response in `raw_result`.
+`call_attempt.run_calle_goal!` submits one Goal Run. The model derives a stable
+idempotency key, saves the public Goal Run ID in `provider_goal_run_id`, and
+records the provider response in `raw_result`.
+
+`call_attempt.sync_calle_goal!` fetches that Goal Run once and synchronizes the
+latest provider response. Result payloads remain intact in `raw_result` unless
+an explicit published result schema is available for mapping.
 
 # Rails application notes
 

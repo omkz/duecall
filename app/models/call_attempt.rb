@@ -1,4 +1,8 @@
 class CallAttempt < ApplicationRecord
+  class InvalidTransitionError < StandardError; end
+
+  include CalleGoal
+
   belongs_to :invoice
   belongs_to :contact
 
