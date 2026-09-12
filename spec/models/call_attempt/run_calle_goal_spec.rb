@@ -30,6 +30,7 @@ RSpec.describe CallAttempt::CalleGoal do
       goal_id: "goal_overdue",
       phone: "+628123456789",
       variables: {
+        calling_company_name: "DueCall Ltd",
         customer_name: "Acme",
         contact_name: "Rina",
         invoice_number: "INV-001",
@@ -40,7 +41,11 @@ RSpec.describe CallAttempt::CalleGoal do
       idempotency_key: "duecall:call_attempt:#{call_attempt.id}:overdue_invoice_goal:v1"
     ).and_return(provider_response)
 
-    result = call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
+    result = call_attempt.run_calle_goal!(
+      client:,
+      goal_id: "goal_overdue",
+      calling_company_name: "DueCall Ltd"
+    )
 
     expect(result).to eq(call_attempt)
     expect(call_attempt).to be_in_progress
@@ -60,7 +65,11 @@ RSpec.describe CallAttempt::CalleGoal do
     )
     allow(client).to receive(:create_goal_run).and_raise(error)
 
-    call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
+    call_attempt.run_calle_goal!(
+      client:,
+      goal_id: "goal_overdue",
+      calling_company_name: "DueCall Ltd"
+    )
 
     expect(call_attempt).to be_failed
     expect(call_attempt.provider_goal_run_id).to be_nil
@@ -78,16 +87,32 @@ RSpec.describe CallAttempt::CalleGoal do
     expect(client).not_to receive(:create_goal_run)
 
     expect do
-      call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue")
+      call_attempt.run_calle_goal!(
+        client:,
+        goal_id: "goal_overdue",
+        calling_company_name: "DueCall Ltd"
+      )
     end.to raise_error(CallAttempt::InvalidTransitionError)
   end
 
   it "marks the attempt failed when configuration is missing" do
-    call_attempt.run_calle_goal!(client:, goal_id: nil)
+    call_attempt.run_calle_goal!(client:, goal_id: nil, calling_company_name: "DueCall Ltd")
 
     expect(call_attempt).to be_failed
     expect(call_attempt.raw_result.dig("submission_error", "error_message")).to eq(
       "CALL-E overdue invoice Goal ID is not configured"
+    )
+  end
+
+  it "fails safely before submission when the calling company name is blank" do
+    expect(client).not_to receive(:create_goal_run)
+
+    call_attempt.run_calle_goal!(client:, goal_id: "goal_overdue", calling_company_name: "  ")
+
+    expect(call_attempt).to be_failed
+    expect(call_attempt.provider_goal_run_id).to be_nil
+    expect(call_attempt.raw_result.dig("submission_error", "error_message")).to eq(
+      "DueCall calling company name is not configured"
     )
   end
 end

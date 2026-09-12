@@ -1,15 +1,17 @@
 module CallAttempt::CalleGoal
   extend ActiveSupport::Concern
 
-  def run_calle_goal!(client: nil, goal_id: default_calle_goal_id)
+  def run_calle_goal!(client: nil, goal_id: default_calle_goal_id,
+    calling_company_name: default_calling_company_name)
     with_lock do
       ensure_goal_status!(:pending)
       ensure_goal_id!(goal_id)
+      calling_company_name = ensure_calling_company_name!(calling_company_name)
 
       response = (client || Calle::Client.new).create_goal_run(
         goal_id:,
         phone: contact.phone_number,
-        variables: calle_goal_variables,
+        variables: calle_goal_variables(calling_company_name:),
         idempotency_key: calle_idempotency_key
       )
 
@@ -67,8 +69,9 @@ module CallAttempt::CalleGoal
       update!(attributes)
     end
 
-    def calle_goal_variables
+    def calle_goal_variables(calling_company_name:)
       {
+        calling_company_name:,
         customer_name: invoice.customer.name,
         contact_name: contact.name,
         invoice_number: invoice.number,
@@ -99,6 +102,10 @@ module CallAttempt::CalleGoal
       Rails.application.config.x.calle.overdue_invoice_goal_id
     end
 
+    def default_calling_company_name
+      Rails.application.config.x.calle.calling_company_name
+    end
+
     def ensure_goal_status!(expected_status)
       return if public_send("#{expected_status}?")
 
@@ -109,6 +116,13 @@ module CallAttempt::CalleGoal
       return if goal_id.present?
 
       raise Calle::ConfigurationError, "CALL-E overdue invoice Goal ID is not configured"
+    end
+
+    def ensure_calling_company_name!(calling_company_name)
+      calling_company_name = calling_company_name.to_s.strip
+      return calling_company_name if calling_company_name.present?
+
+      raise Calle::ConfigurationError, "DueCall calling company name is not configured"
     end
 
     def ensure_goal_run_id!
