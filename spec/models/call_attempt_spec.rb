@@ -65,7 +65,8 @@ RSpec.describe CallAttempt, type: :model do
       "refused" => 6,
       "no_answer" => 7,
       "wrong_contact" => 8,
-      "human_followup_required" => 9
+      "human_followup_required" => 9,
+      "unknown" => 10
     )
 
     call_attempt = described_class.create!(invoice: invoice, contact: contact)

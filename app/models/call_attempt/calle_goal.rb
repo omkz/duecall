@@ -61,12 +61,41 @@ module CallAttempt::CalleGoal
       attributes[:provider_call_id] = response["call_id"] if response["call_id"].present?
 
       if !response["result"].nil?
-        attributes.merge!(status: :completed, completed_at: calle_completion_time(response))
+        attributes.merge!(
+          calle_result_attributes(response["result"]),
+          status: :completed,
+          completed_at: calle_completion_time(response)
+        )
       elsif !response["error"].nil?
         attributes.merge!(status: :failed, completed_at: calle_completion_time(response))
       end
 
       update!(attributes)
+    end
+
+    def calle_result_attributes(result)
+      result = {} unless result.is_a?(Hash)
+
+      {
+        outcome: calle_outcome(result["outcome"]),
+        reason: result["reason"].presence,
+        summary: result["customer_summary"].presence,
+        promise_to_pay_on: calle_promise_to_pay_on(result["promise_to_pay_on"])
+      }
+    end
+
+    def calle_outcome(provider_outcome)
+      provider_outcome = provider_outcome.to_s
+      CallAttempt.outcomes.key?(provider_outcome) ? provider_outcome : "unknown"
+    end
+
+    def calle_promise_to_pay_on(value)
+      return if value.blank? || !value.is_a?(String)
+      return unless value.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+
+      Date.iso8601(value)
+    rescue Date::Error
+      nil
     end
 
     def calle_goal_variables(calling_company_name:)

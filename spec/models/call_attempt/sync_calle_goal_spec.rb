@@ -63,20 +63,105 @@ RSpec.describe CallAttempt::CalleGoal do
     expect(call_attempt.completed_at).to be_nil
   end
 
-  it "completes the attempt when a result is available without guessing field mappings" do
+  it "maps a wrong contact result with a blank payment promise" do
+    result = {
+      "reason" => "The respondent was not available as a verified authorized contact.",
+      "outcome" => "wrong_contact",
+      "customer_summary" => "The hotline respondent could not verify or discuss the invoice.",
+      "promise_to_pay_on" => ""
+    }
     response = provider_response(
       status: "completed",
-      result: { "collection_outcome" => "custom_provider_value", "provider_notes" => "Call back Friday" },
+      result:,
       completed_at: "2026-09-12T02:15:00Z"
     )
 
     sync_with(response)
 
     expect(call_attempt).to be_completed
+    expect(call_attempt).to be_wrong_contact
+    expect(call_attempt.reason).to eq("The respondent was not available as a verified authorized contact.")
+    expect(call_attempt.summary).to eq("The hotline respondent could not verify or discuss the invoice.")
+    expect(call_attempt.promise_to_pay_on).to be_nil
     expect(call_attempt.raw_result).to eq(response)
     expect(call_attempt.completed_at).to eq(Time.iso8601("2026-09-12T02:15:00Z"))
-    expect(call_attempt.outcome).to be_nil
+  end
+
+  it "maps a promised payment with a valid date" do
+    response = provider_response(
+      status: "completed",
+      result: {
+        "outcome" => "promised_to_pay",
+        "promise_to_pay_on" => "2026-09-18",
+        "reason" => "",
+        "customer_summary" => "The customer committed to payment on September 18."
+      }
+    )
+
+    sync_with(response)
+
+    expect(call_attempt).to be_promised_to_pay
+    expect(call_attempt.promise_to_pay_on).to eq(Date.new(2026, 9, 18))
+    expect(call_attempt.reason).to be_nil
+    expect(call_attempt.summary).to eq("The customer committed to payment on September 18.")
+    expect(call_attempt.raw_result).to eq(response)
+  end
+
+  it "maps the published unknown outcome" do
+    response = provider_response(
+      status: "completed",
+      result: {
+        "outcome" => "unknown",
+        "promise_to_pay_on" => nil,
+        "reason" => "Insufficient information",
+        "customer_summary" => "The payment situation could not be determined."
+      }
+    )
+
+    sync_with(response)
+
+    expect(call_attempt).to be_unknown
+    expect(call_attempt.raw_result).to eq(response)
+  end
+
+  it "maps an unexpected future outcome to unknown without changing the raw result" do
+    response = provider_response(
+      status: "completed",
+      result: {
+        "outcome" => "future_provider_outcome",
+        "promise_to_pay_on" => "",
+        "reason" => "New provider category",
+        "customer_summary" => "Provider returned a category DueCall does not know yet."
+      }
+    )
+
+    sync_with(response)
+
+    expect(call_attempt).to be_completed
+    expect(call_attempt).to be_unknown
+    expect(call_attempt.raw_result).to eq(response)
+    expect(call_attempt.raw_result.dig("result", "outcome")).to eq("future_provider_outcome")
+  end
+
+  it "ignores a malformed payment date and blank result text without breaking synchronization" do
+    response = provider_response(
+      status: "completed",
+      result: {
+        "outcome" => "payment_pending",
+        "promise_to_pay_on" => "next week",
+        "reason" => "  ",
+        "customer_summary" => ""
+      }
+    )
+
+    sync_with(response)
+
+    expect(call_attempt).to be_completed
+    expect(call_attempt).to be_payment_pending
+    expect(call_attempt.promise_to_pay_on).to be_nil
+    expect(call_attempt.reason).to be_nil
     expect(call_attempt.summary).to be_nil
+    expect(call_attempt.raw_result).to eq(response)
   end
 
   it "fails the attempt when the Goal Run returns an error" do
