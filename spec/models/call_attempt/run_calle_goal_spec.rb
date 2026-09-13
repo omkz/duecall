@@ -15,11 +15,17 @@ RSpec.describe CallAttempt::CalleGoal do
   let(:call_attempt) { CallAttempt.create!(invoice:, contact:) }
   let(:client) { instance_double(Calle::Client) }
 
-  it "creates a Goal Run and moves the attempt to in progress" do
+  it "submits the exact published inputs using the configured Goal and selected contact" do
+    allow(Rails.application.config.x.calle).to receive(:overdue_invoice_goal_id)
+      .and_return("goal_from_configuration")
+    allow(Rails.application.config.x.calle).to receive(:calling_company_name)
+      .and_return("DueCall Ltd")
+    customer.contacts.create!(name: "Other Contact", phone_number: "+628111111111")
+
     provider_response = {
       "object" => "goal_run",
       "id" => "rgrp_invoice_123",
-      "goal_id" => "goal_overdue",
+      "goal_id" => "goal_from_configuration",
       "run_id" => "run_invoice_123",
       "call_id" => nil,
       "status" => "queued",
@@ -27,7 +33,7 @@ RSpec.describe CallAttempt::CalleGoal do
       "error" => nil
     }
     expect(client).to receive(:create_goal_run).with(
-      goal_id: "goal_overdue",
+      goal_id: "goal_from_configuration",
       phone: "+628123456789",
       variables: {
         calling_company_name: "DueCall Ltd",
@@ -41,11 +47,7 @@ RSpec.describe CallAttempt::CalleGoal do
       idempotency_key: "duecall:call_attempt:#{call_attempt.id}:overdue_invoice_goal:v1"
     ).and_return(provider_response)
 
-    result = call_attempt.run_calle_goal!(
-      client:,
-      goal_id: "goal_overdue",
-      calling_company_name: "DueCall Ltd"
-    )
+    result = call_attempt.run_calle_goal!(client:)
 
     expect(result).to eq(call_attempt)
     expect(call_attempt).to be_in_progress
