@@ -5,8 +5,62 @@
   <p class="mt-1 text-sm text-slate-500">All invoices across your customers.</p>
 </div>
 
+<div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+  <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Overdue invoices</p>
+    <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @dashboard_metrics[:overdue_invoices] %></p>
+    <p class="mt-1 text-xs text-slate-500">Open invoices past their due date.</p>
+  </div>
+  <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Calls awaiting result</p>
+    <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @dashboard_metrics[:calls_awaiting_result] %></p>
+    <p class="mt-1 text-xs text-slate-500">CALL-E is currently in progress.</p>
+  </div>
+  <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Autonomous retries</p>
+    <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @dashboard_metrics[:autonomous_retries] %></p>
+    <p class="mt-1 text-xs text-slate-500">Guarded retries eligible for automatic scheduling.</p>
+  </div>
+  <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Promises to pay</p>
+    <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @dashboard_metrics[:promises_to_pay] %></p>
+    <p class="mt-1 text-xs text-slate-500">Completed calls with a promised payment.</p>
+  </div>
+  <div class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Human attention required</p>
+    <p class="mt-2 text-3xl font-bold tracking-tight text-slate-950"><%= @dashboard_metrics[:human_attention_required] %></p>
+    <p class="mt-1 text-xs text-slate-500">Calls waiting on a person to follow up.</p>
+  </div>
+</div>
+
+<% if @recent_call_attempts.any? %>
+  <div class="mt-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Recent call attempts</h2>
+    <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <ul class="divide-y divide-slate-200">
+        <% @recent_call_attempts.each do |call_attempt| %>
+          <li>
+            <%= link_to call_attempt, class: "flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-50" do %>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-slate-900">
+                  <%= call_attempt.contact.name %>
+                  <span class="font-normal text-slate-500">&middot; <%= call_attempt.invoice.number %></span>
+                </p>
+                <p class="mt-1 text-xs text-slate-500"><%= (call_attempt.started_at || call_attempt.created_at).to_fs(:long) %></p>
+              </div>
+              <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"><%= call_attempt.status.humanize %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  </div>
+<% end %>
+
+<h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">All invoices</h2>
+
 <% if @invoices.any? %>
-  <div class="mt-8 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+  <div class="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
     <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
       <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
         <tr>
@@ -35,7 +89,7 @@
     </table>
   </div>
 <% else %>
-  <div class="mt-8 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+  <div class="mt-3 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
     <h2 class="text-lg font-semibold text-slate-900">No invoices yet</h2>
     <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500">Open a customer to add the first invoice.</p>
     <%= link_to "View customers", customers_path, class: "mt-5 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
