@@ -1,5 +1,12 @@
 <% content_for :title, "Call for #{@invoice.number} · DueCall" %>
 
+<% if notice = flash[:notice] %>
+  <p class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><%= notice %></p>
+<% end %>
+<% if alert = flash[:alert] %>
+  <p class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><%= alert %></p>
+<% end %>
+
 <div>
   <%= link_to "← #{@invoice.number}", invoice_path(@invoice), class: "text-sm font-medium text-slate-500 hover:text-slate-900" %>
   <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -9,11 +16,53 @@
   <p class="mt-2 text-sm text-slate-500"><%= @customer.name %> · <%= @invoice.number %></p>
 </div>
 
+<% if @call_attempt.pending? %>
+  <section class="mt-8 rounded-xl border-2 border-amber-300 bg-amber-50 p-5">
+    <h2 class="text-lg font-bold text-slate-950">Confirm real phone call</h2>
+    <p class="mt-2 font-semibold text-slate-900">Call <%= @contact.name %> at <%= @contact.phone_number %></p>
+    <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+      <div>
+        <dt class="font-medium text-slate-500">Invoice</dt>
+        <dd class="mt-1 text-slate-900"><%= @invoice.number %></dd>
+      </div>
+      <div>
+        <dt class="font-medium text-slate-500">Amount</dt>
+        <dd class="mt-1 text-slate-900"><%= format_money(@invoice.amount_cents, @invoice.currency) %></dd>
+      </div>
+      <div>
+        <dt class="font-medium text-slate-500">Due date</dt>
+        <dd class="mt-1 text-slate-900"><%= @invoice.due_on.to_fs(:long) %></dd>
+      </div>
+    </dl>
+    <%= button_to "Place CALL-E call",
+      run_call_attempt_path(@call_attempt),
+      method: :post,
+      class: "mt-5 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600",
+      form: {
+        data: {
+          turbo_confirm: "This will place a real phone call to #{@contact.name} at #{@contact.phone_number}. Continue?"
+        }
+      } %>
+  </section>
+<% end %>
+
 <dl class="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
   <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Invoice</dt>
     <dd class="text-sm sm:col-span-2"><%= link_to @invoice.number, @invoice, class: "font-medium text-blue-600 hover:text-blue-500" %></dd>
   </div>
+  <% if @call_attempt.provider_goal_run_id.present? %>
+    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+      <dt class="text-sm font-medium text-slate-500">CALL-E Goal Run ID</dt>
+      <dd class="break-all text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.provider_goal_run_id %></dd>
+    </div>
+  <% end %>
+  <% if @call_attempt.provider_call_id.present? %>
+    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+      <dt class="text-sm font-medium text-slate-500">CALL-E Call ID</dt>
+      <dd class="break-all text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.provider_call_id %></dd>
+    </div>
+  <% end %>
   <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Customer</dt>
     <dd class="text-sm sm:col-span-2"><%= link_to @customer.name, @customer, class: "font-medium text-blue-600 hover:text-blue-500" %></dd>

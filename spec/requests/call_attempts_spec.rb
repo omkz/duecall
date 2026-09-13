@@ -6,7 +6,7 @@ RSpec.describe "Call attempts", type: :request do
   let!(:customer) { user.customers.create!(name: "Acme") }
   let!(:contact) { customer.contacts.create!(name: "Rina", phone_number: "+628123456789") }
   let!(:invoice) do
-    customer.invoices.create!(number: "INV-001", amount_cents: 12_500, due_on: Date.current)
+    customer.invoices.create!(number: "INV-001", amount_cents: 12_500, due_on: Date.current - 1.day)
   end
 
   before do
@@ -24,6 +24,8 @@ RSpec.describe "Call attempts", type: :request do
       summary: "Rina promised to pay this week.",
       transcript: "Agent: Hello\nRina: I will pay this week.",
       raw_result: { private_provider_payload: "do not display" },
+      provider_goal_run_id: "rgrp_invoice_123",
+      provider_call_id: "calling_call_invoice_123",
       started_at: Time.current - 5.minutes,
       completed_at: Time.current
     )
@@ -47,9 +49,122 @@ RSpec.describe "Call attempts", type: :request do
       "Rina",
       "Invoice reminder",
       "positive",
-      "Agent: Hello"
+      "Agent: Hello",
+      "rgrp_invoice_123",
+      "calling_call_invoice_123"
     )
     expect(response.body).not_to include("do not display", "private_provider_payload")
+  end
+
+  it "prepares a pending call for an explicitly selected customer contact without calling CALL-E" do
+    expect(Calle::Client).not_to receive(:new)
+
+    get invoice_path(invoice)
+    expect(response.body).to include("Manual follow-up", "Rina", "+628123456789", "Prepare call")
+
+    expect do
+      post invoice_call_attempts_path(invoice), params: { contact_id: contact.id }
+    end.to change(invoice.call_attempts, :count).by(1)
+
+    call_attempt = invoice.call_attempts.order(:created_at).last
+    expect(call_attempt).to be_pending
+    expect(call_attempt.contact).to eq(contact)
+    expect(call_attempt.provider_goal_run_id).to be_nil
+    expect(response).to redirect_to(call_attempt_path(call_attempt))
+  end
+
+  it "rejects a contact belonging to another customer" do
+    another_customer = user.customers.create!(name: "Another customer")
+    another_contact = another_customer.contacts.create!(name: "Wrong contact", phone_number: "+628111111111")
+
+    expect do
+      post invoice_call_attempts_path(invoice), params: { contact_id: another_contact.id }
+    end.not_to change(CallAttempt, :count)
+
+    expect(response).to have_http_status(:not_found)
+  end
+
+  it "shows the selected details without invoking CALL-E on GET" do
+    call_attempt = invoice.call_attempts.create!(contact: contact)
+    expect_any_instance_of(CallAttempt).not_to receive(:run_calle_goal!)
+
+    get call_attempt_path(call_attempt)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Call Rina at +628123456789",
+      "INV-001",
+      "USD 125.00",
+      invoice.due_on.to_fs(:long),
+      "Place CALL-E call",
+      "This will place a real phone call to Rina at +628123456789. Continue?"
+    )
+  end
+
+  it "invokes the domain behavior only when an owned pending call is explicitly triggered" do
+    call_attempt = invoice.call_attempts.create!(contact: contact)
+    expect_any_instance_of(CallAttempt).to receive(:run_calle_goal!) do |attempt|
+      attempt.update!(status: :in_progress, provider_goal_run_id: "rgrp_invoice_123")
+    end
+
+    post run_call_attempt_path(call_attempt)
+
+    expect(response).to redirect_to(call_attempt_path(call_attempt))
+    follow_redirect!
+    expect(response.body).to include("CALL-E call was submitted.", "rgrp_invoice_123")
+  end
+
+  it "shows a safe failure notice when the domain records a submission failure" do
+    call_attempt = invoice.call_attempts.create!(contact: contact)
+    expect_any_instance_of(CallAttempt).to receive(:run_calle_goal!) do |attempt|
+      attempt.update!(
+        status: :failed,
+        raw_result: { "submission_error" => { "error_message" => "secret provider diagnostic" } }
+      )
+    end
+
+    post run_call_attempt_path(call_attempt)
+
+    expect(response).to redirect_to(call_attempt_path(call_attempt))
+    follow_redirect!
+    expect(response.body).to include(
+      "CALL-E call could not be submitted. Review the configuration and prepare a new call."
+    )
+    expect(response.body).not_to include("secret provider diagnostic")
+  end
+
+  it "does not allow another user's call attempt to be triggered" do
+    other_customer = other_user.customers.create!(name: "Private customer")
+    other_contact = other_customer.contacts.create!(name: "Private contact", phone_number: "+628111111111")
+    other_invoice = other_customer.invoices.create!(
+      number: "PRIVATE-INV",
+      amount_cents: 20_000,
+      due_on: Date.current - 1.day
+    )
+    call_attempt = other_invoice.call_attempts.create!(contact: other_contact)
+    expect_any_instance_of(CallAttempt).not_to receive(:run_calle_goal!)
+
+    post run_call_attempt_path(call_attempt)
+
+    expect(response).to have_http_status(:not_found)
+    expect(call_attempt.reload).to be_pending
+  end
+
+  it "does not offer or prepare calls for invoices that are not overdue and open" do
+    paid_invoice = customer.invoices.create!(
+      number: "PAID-INV",
+      amount_cents: 12_500,
+      due_on: Date.current - 1.day,
+      status: :paid
+    )
+
+    get invoice_path(paid_invoice)
+    expect(response.body).not_to include("Manual follow-up", "Prepare call")
+
+    expect do
+      post invoice_call_attempts_path(paid_invoice), params: { contact_id: contact.id }
+    end.not_to change(CallAttempt, :count)
+    expect(response).to redirect_to(invoice_path(paid_invoice))
   end
 
   it "shows call history only on the correct invoice" do

@@ -3,6 +3,9 @@
 <% if notice = flash[:notice] %>
   <p class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><%= notice %></p>
 <% end %>
+<% if alert = flash[:alert] %>
+  <p class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><%= alert %></p>
+<% end %>
 
 <div class="flex items-start justify-between gap-4">
   <div>
@@ -41,6 +44,33 @@
     </div>
   <% end %>
 </dl>
+
+<% if @invoice.overdue? %>
+  <section class="mt-10 rounded-xl border border-amber-200 bg-amber-50 p-5">
+    <h2 class="text-lg font-bold tracking-tight text-slate-950">Manual follow-up</h2>
+    <p class="mt-1 text-sm text-slate-600">Choose the exact contact to prepare. Preparing a call does not place it.</p>
+
+    <% if @contacts.any? %>
+      <ul class="mt-4 divide-y divide-amber-200">
+        <% @contacts.each do |contact| %>
+          <li class="flex flex-wrap items-center justify-between gap-4 py-3">
+            <div>
+              <p class="font-semibold text-slate-900"><%= contact.name %></p>
+              <p class="text-sm text-slate-600"><%= contact.phone_number %></p>
+            </div>
+            <%= button_to "Prepare call",
+              invoice_call_attempts_path(@invoice),
+              method: :post,
+              params: { contact_id: contact.id },
+              class: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" %>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="mt-4 text-sm text-slate-600">Add an authorized contact before preparing a call.</p>
+    <% end %>
+  </section>
+<% end %>
 
 <section class="mt-10">
   <div>

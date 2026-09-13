@@ -1,8 +1,12 @@
 Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
-  resources :call_attempts, only: :show
-  resources :invoices, only: :index
+  resources :call_attempts, only: :show do
+    post :run, on: :member
+  end
+  resources :invoices, only: :index do
+    resources :call_attempts, only: :create
+  end
   resources :customers do
     resources :contacts, except: :index, shallow: true
     resources :invoices, except: :index, shallow: true
