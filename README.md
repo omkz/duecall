@@ -1,8 +1,87 @@
 # DueCall
 
-## CALL-E Goal Run configuration
+Autonomous AI accounts-receivable follow-up powered by CALL-E.
 
-DueCall submits overdue-invoice follow-ups through an already-published CALL-E Goal. Configure these server-side environment variables:
+DueCall helps businesses automate the repetitive parts of chasing overdue
+invoices: it places structured follow-up calls, reads the outcome, and either
+closes the loop, schedules another guarded attempt, or hands the case to a
+human. Ambiguous or risky situations — disputes, wrong contacts, missing
+information — are routed to a person instead of being resolved automatically.
+
+## What DueCall does
+
+1. An overdue invoice is selected.
+2. DueCall starts a CALL-E Goal Run for the authorized customer contact.
+3. CALL-E returns structured payment outcome data.
+4. DueCall decides whether to stop, retry, or require human follow-up.
+5. Eligible retries can be scheduled and executed automatically during the
+   contact's business hours.
+
+The invoice and call-attempt pages update in real time as results arrive —
+no manual refresh needed.
+
+## Why autonomous accounts receivable follow-up
+
+Accounts-receivable teams spend a lot of time repeating the same
+follow-up call for overdue invoices. Many of those outcomes are routine —
+a promise to pay, a "call back later," a payment already in flight — and
+don't need a person on the line. DueCall automates that repetitive
+follow-up, while failing closed to a human whenever the outcome is
+ambiguous or the situation calls for judgment (a dispute, a wrong contact,
+missing information, and so on).
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Invoice"] --> B["DueCall Rails app"]
+    B --> C["CALL-E Goal Run"]
+    C --> D["Phone call"]
+    D --> E["Solid Queue polling"]
+    E --> F["Structured outcome"]
+    F --> G["Decision engine"]
+    G --> H["Stop"]
+    G --> I["Human follow-up"]
+    G --> J["Guarded retry"]
+    J --> K["Solid Queue scheduled execution"]
+    K --> L["CALL-E follow-up"]
+```
+
+```mermaid
+flowchart LR
+    A["CallAttempt update"] --> B["Turbo Stream broadcast"]
+    B --> C["Solid Cable"]
+    C --> D["Browser UI"]
+```
+
+## Safety and guardrails
+
+- Autonomous follow-up is opt-in per invoice.
+- Only overdue, open invoices are eligible for a call.
+- Automatic scheduling respects the contact's configured timezone and
+  business hours (weekdays, 9am–5pm local).
+- There is a maximum number of automatic call submissions per invoice.
+- Duplicate follow-up submission is prevented before a new automatic call
+  is placed.
+- CALL-E Goal Run submission is idempotent.
+- A paid or cancelled invoice stops further automation.
+- A contact with no configured timezone routes to human follow-up instead
+  of guessing a schedule.
+- Outcomes such as wrong contact, dispute, refusal, missing information,
+  and other ambiguous results route to human follow-up rather than
+  retrying automatically.
+- Placing a real phone call manually requires an explicit confirmation
+  step in the UI.
+
+## CALL-E integration
+
+DueCall creates a CALL-E Goal Run at runtime for the selected invoice and
+contact. CALL-E performs the phone conversation, and DueCall polls the Goal
+Run until a result is available. Structured fields returned by CALL-E —
+outcome, reason, customer summary, and promise-to-pay date — drive all of
+the downstream stop/retry/human-follow-up decisions above.
+
+Configure these server-side environment variables:
 
 * `CALLE_API_KEY` — CALL-E API key.
 * `CALLE_OVERDUE_INVOICE_GOAL_ID` — public ID of the published overdue-invoice Goal.
@@ -22,7 +101,31 @@ records the provider response in `raw_result`.
 latest provider response. Result payloads remain intact in `raw_result` unless
 an explicit published result schema is available for mapping.
 
-## Local setup
+## Real-time results
+
+CALL-E → Solid Queue background polling → `CallAttempt` update → Turbo
+Stream broadcast → Solid Cable → browser.
+
+The current implementation does not use browser polling or CALL-E webhooks;
+results reach the browser only through this Turbo Stream / Solid Cable path.
+
+## Tech stack
+
+- Ruby on Rails
+- PostgreSQL
+- CALL-E
+- Solid Queue
+- Solid Cable
+- Turbo Streams
+- Tailwind CSS
+- Docker
+- Render-ready deployment
+
+## Screenshots / demo
+
+Screenshots and demo media can be added here.
+
+## Local development
 
 Requirements: Ruby, PostgreSQL, and the versions pinned by the repository.
 `bin/setup` runs `db:prepare`, which seeds a demo contact, so set
@@ -42,28 +145,20 @@ development also uses three separate logical PostgreSQL databases —
 `duecall_development_cable` — configured in `config/database.yml` and
 `config/cable.yml`.
 
-Run the test suite with:
+## Testing
 
 ```bash
 bin/rspec
 ```
 
-## Background jobs and real-time updates
+## Deployment
 
-* **Solid Queue** runs `CallAttempt::SyncCalleGoalJob`, which polls CALL-E for
-  the result of a submitted Goal Run. There is no CALL-E webhook; the app
-  only uses polling jobs to synchronize call results.
-* **Solid Cable** carries Action Cable traffic across processes (the web
-  process and the Solid Queue worker). When a job updates a `CallAttempt`,
-  the model broadcasts a Turbo Stream replacing that attempt's details
-  partial, so the CallAttempt show page updates automatically without any
-  client-side polling.
+DueCall can optionally be deployed to Render using the included
+[Render Blueprint](render.yaml); no other deployment target is required to
+run the app.
 
-## Deploying to Render
-
-The [Render Blueprint](render.yaml) provisions one Docker web service and one
-PostgreSQL instance in Singapore. Rails uses four logical databases on that
-single instance:
+The Blueprint provisions one Docker web service and one PostgreSQL instance
+in Singapore. Rails uses four logical databases on that single instance:
 
 - `duecall_production`
 - `duecall_production_cache`
@@ -99,10 +194,10 @@ Render prompts for these when you create the Blueprint (`sync: false` in
 * `RAILS_MASTER_KEY` — from `config/master.key`.
 * `CALLE_API_KEY` — CALL-E API key.
 * `DUECALL_DEMO_PASSWORD` — password for the seeded demo user.
-* `DUECALL_DEMO_PHONE` — E.164 phone number for the seeded demo contact (for
-  example, the official CALL-E test hotline). `db/seeds.rb` requires this to
-  be a valid E.164 number and raises during `db:prepare` if it is missing,
-  so the very first deploy will fail to boot without it.
+* `DUECALL_DEMO_PHONE` — E.164 phone number for the seeded demo contact.
+  `db/seeds.rb` requires this to be a valid E.164 number and raises during
+  `db:prepare` if it is missing, so the very first deploy will fail to boot
+  without it.
 
 To actually place CALL-E calls (not just seed demo data), also add these as
 regular environment variables on the web service after the Blueprint is
