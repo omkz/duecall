@@ -23,6 +23,7 @@ module CallAttempt::CalleGoal
       )
     end
 
+    CallAttempt::SyncCalleGoalJob.schedule(self)
     self
   rescue Calle::ConfigurationError, Calle::RequestError => error
     update!(status: :failed, raw_result: { "submission_error" => calle_error_details(error) })

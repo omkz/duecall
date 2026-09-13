@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe CallAttempt::CalleGoal do
+  include ActiveJob::TestHelper
+
   let(:user) { User.create!(email_address: "owner@example.com", password: "password") }
   let(:customer) { user.customers.create!(name: "Acme") }
   let(:invoice) do
@@ -14,6 +16,13 @@ RSpec.describe CallAttempt::CalleGoal do
   let(:contact) { customer.contacts.create!(name: "Rina", phone_number: "+628123456789") }
   let(:call_attempt) { CallAttempt.create!(invoice:, contact:) }
   let(:client) { instance_double(Calle::Client) }
+
+  before do
+    ActiveJob::Base.queue_adapter = :test
+    clear_enqueued_jobs
+  end
+
+  after { clear_enqueued_jobs }
 
   it "submits the exact published inputs using the configured Goal and selected contact" do
     allow(Rails.application.config.x.calle).to receive(:overdue_invoice_goal_id)
@@ -47,7 +56,13 @@ RSpec.describe CallAttempt::CalleGoal do
       idempotency_key: "duecall:call_attempt:#{call_attempt.id}:overdue_invoice_goal:v1"
     ).and_return(provider_response)
 
-    result = call_attempt.run_calle_goal!(client:)
+    result = nil
+    expect do
+      result = call_attempt.run_calle_goal!(client:)
+    end.to have_enqueued_job(CallAttempt::SyncCalleGoalJob).with(
+      call_attempt,
+      polls_remaining: CallAttempt::SyncCalleGoalJob::MAX_POLLS
+    )
 
     expect(result).to eq(call_attempt)
     expect(call_attempt).to be_in_progress
@@ -67,11 +82,13 @@ RSpec.describe CallAttempt::CalleGoal do
     )
     allow(client).to receive(:create_goal_run).and_raise(error)
 
-    call_attempt.run_calle_goal!(
-      client:,
-      goal_id: "goal_overdue",
-      calling_company_name: "DueCall Ltd"
-    )
+    expect do
+      call_attempt.run_calle_goal!(
+        client:,
+        goal_id: "goal_overdue",
+        calling_company_name: "DueCall Ltd"
+      )
+    end.not_to have_enqueued_job(CallAttempt::SyncCalleGoalJob)
 
     expect(call_attempt).to be_failed
     expect(call_attempt.provider_goal_run_id).to be_nil
