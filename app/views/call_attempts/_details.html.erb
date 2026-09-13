@@ -6,7 +6,21 @@
     <% if call_attempt.in_progress? %>
       <span class="text-sm italic text-slate-500">Waiting for CALL-E result… This page will update automatically.</span>
     <% end %>
+    <% if call_attempt.parent_call_attempt_id.present? %>
+      <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">Automatic follow-up</span>
+    <% end %>
   </div>
+
+  <% if (parent_call_attempt = call_attempt.parent_call_attempt) %>
+    <p class="mt-2 text-sm">
+      <%= link_to "Follow-up to previous call", parent_call_attempt, class: "font-medium text-blue-600 hover:text-blue-500" %>
+    </p>
+  <% end %>
+  <% if (follow_up_call_attempt = call_attempt.follow_up_call_attempt) %>
+    <p class="mt-2 text-sm">
+      <%= link_to "Follow-up scheduled/created", follow_up_call_attempt, class: "font-medium text-blue-600 hover:text-blue-500" %>
+    </p>
+  <% end %>
 
   <dl class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
     <% if call_attempt.provider_goal_run_id.present? %>

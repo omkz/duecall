@@ -257,6 +257,80 @@ RSpec.describe "Call attempts", type: :request do
     end
   end
 
+  it "labels automatic follow-up lineage and numbers attempts on the invoice call history" do
+    root_call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      status: :completed,
+      outcome: :payment_pending,
+      next_action: :retry_call,
+      next_action_on: Date.current + 1.day
+    )
+    follow_up_call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      parent_call_attempt: root_call_attempt
+    )
+
+    get invoice_path(invoice)
+
+    document = Nokogiri::HTML5.parse(response.body)
+    list_items = document.css("li")
+    root_item = list_items.find { |li| li.text.include?("Attempt 1") }
+    follow_up_item = list_items.find { |li| li.text.include?("Attempt 2") }
+
+    expect(root_item.text).not_to include("Automatic follow-up")
+    expect(follow_up_item.text).to include("Automatic follow-up")
+
+    expect(root_item.to_html).to include("Follow-up scheduled/created", call_attempt_path(follow_up_call_attempt))
+    expect(follow_up_item.to_html).to include("Follow-up to previous call", call_attempt_path(root_call_attempt))
+  end
+
+  it "does not show an automatic follow-up badge for a manually prepared root attempt" do
+    manual_call_attempt = invoice.call_attempts.create!(contact: contact, summary: "Manual outreach")
+
+    get invoice_path(invoice)
+
+    expect(response.body).to include("Attempt 1", "Manual outreach")
+    expect(response.body).not_to include("Automatic follow-up")
+  end
+
+  it "shows follow-up lineage and safe navigation on the CallAttempt details page" do
+    root_call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      status: :completed,
+      outcome: :payment_pending,
+      next_action: :retry_call,
+      next_action_on: Date.current + 1.day
+    )
+    follow_up_call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      parent_call_attempt: root_call_attempt
+    )
+
+    get call_attempt_path(root_call_attempt)
+    expect(response.body).not_to include("Automatic follow-up")
+    expect(response.body).to include("Follow-up scheduled/created", call_attempt_path(follow_up_call_attempt))
+
+    get call_attempt_path(follow_up_call_attempt)
+    expect(response.body).to include("Automatic follow-up")
+    expect(response.body).to include("Follow-up to previous call", call_attempt_path(root_call_attempt))
+  end
+
+  it "does not imply a follow-up call happened when only a retry is scheduled" do
+    root_call_attempt = invoice.call_attempts.create!(
+      contact: contact,
+      status: :completed,
+      outcome: :payment_pending,
+      next_action: :retry_call,
+      next_action_on: Date.current + 1.day
+    )
+
+    get invoice_path(invoice)
+    expect(response.body).not_to include("Follow-up scheduled/created")
+
+    get call_attempt_path(root_call_attempt)
+    expect(response.body).not_to include("Follow-up scheduled/created")
+  end
+
   it "explains when human follow-up is required" do
     call_attempt = invoice.call_attempts.create!(
       contact:,
