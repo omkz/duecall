@@ -280,7 +280,7 @@ RSpec.describe "Call attempts", type: :request do
     expect(root_item.text).not_to include("Automatic follow-up")
     expect(follow_up_item.text).to include("Automatic follow-up")
 
-    expect(root_item.to_html).to include("Follow-up scheduled/created", call_attempt_path(follow_up_call_attempt))
+    expect(root_item.to_html).to include("View automatic follow-up", call_attempt_path(follow_up_call_attempt))
     expect(follow_up_item.to_html).to include("Follow-up to previous call", call_attempt_path(root_call_attempt))
   end
 
@@ -308,7 +308,7 @@ RSpec.describe "Call attempts", type: :request do
 
     get call_attempt_path(root_call_attempt)
     expect(response.body).not_to include("Automatic follow-up")
-    expect(response.body).to include("Follow-up scheduled/created", call_attempt_path(follow_up_call_attempt))
+    expect(response.body).to include("View automatic follow-up", call_attempt_path(follow_up_call_attempt))
 
     get call_attempt_path(follow_up_call_attempt)
     expect(response.body).to include("Automatic follow-up")
@@ -325,10 +325,10 @@ RSpec.describe "Call attempts", type: :request do
     )
 
     get invoice_path(invoice)
-    expect(response.body).not_to include("Follow-up scheduled/created")
+    expect(response.body).not_to include("View automatic follow-up")
 
     get call_attempt_path(root_call_attempt)
-    expect(response.body).not_to include("Follow-up scheduled/created")
+    expect(response.body).not_to include("View automatic follow-up")
   end
 
   it "explains when human follow-up is required" do
