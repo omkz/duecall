@@ -83,6 +83,8 @@ RSpec.describe CallAttempt::CalleGoal do
     expect(call_attempt.reason).to eq("The respondent was not available as a verified authorized contact.")
     expect(call_attempt.summary).to eq("The hotline respondent could not verify or discuss the invoice.")
     expect(call_attempt.promise_to_pay_on).to be_nil
+    expect(call_attempt).to be_human_followup
+    expect(call_attempt.next_action_on).to be_nil
     expect(call_attempt.raw_result).to eq(response)
     expect(call_attempt.completed_at).to eq(Time.iso8601("2026-09-12T02:15:00Z"))
   end
@@ -102,6 +104,8 @@ RSpec.describe CallAttempt::CalleGoal do
 
     expect(call_attempt).to be_promised_to_pay
     expect(call_attempt.promise_to_pay_on).to eq(Date.new(2026, 9, 18))
+    expect(call_attempt).to be_retry_call
+    expect(call_attempt.next_action_on).to eq(Date.new(2026, 9, 19))
     expect(call_attempt.reason).to be_nil
     expect(call_attempt.summary).to eq("The customer committed to payment on September 18.")
     expect(call_attempt.raw_result).to eq(response)
@@ -121,6 +125,8 @@ RSpec.describe CallAttempt::CalleGoal do
     sync_with(response)
 
     expect(call_attempt).to be_unknown
+    expect(call_attempt).to be_human_followup
+    expect(call_attempt.next_action_on).to be_nil
     expect(call_attempt.raw_result).to eq(response)
   end
 
@@ -139,6 +145,7 @@ RSpec.describe CallAttempt::CalleGoal do
 
     expect(call_attempt).to be_completed
     expect(call_attempt).to be_unknown
+    expect(call_attempt).to be_human_followup
     expect(call_attempt.raw_result).to eq(response)
     expect(call_attempt.raw_result.dig("result", "outcome")).to eq("future_provider_outcome")
   end
@@ -159,6 +166,8 @@ RSpec.describe CallAttempt::CalleGoal do
     expect(call_attempt).to be_completed
     expect(call_attempt).to be_payment_pending
     expect(call_attempt.promise_to_pay_on).to be_nil
+    expect(call_attempt).to be_retry_call
+    expect(call_attempt.next_action_on).to eq(Date.current + 2.days)
     expect(call_attempt.reason).to be_nil
     expect(call_attempt.summary).to be_nil
     expect(call_attempt.raw_result).to eq(response)
@@ -174,6 +183,9 @@ RSpec.describe CallAttempt::CalleGoal do
     sync_with(response)
 
     expect(call_attempt).to be_failed
+    expect(call_attempt.outcome).to be_nil
+    expect(call_attempt.next_action).to be_nil
+    expect(call_attempt.next_action_on).to be_nil
     expect(call_attempt.raw_result).to eq(response)
     expect(call_attempt.completed_at).to eq(Time.iso8601("2026-09-12T02:16:00Z"))
   end
@@ -203,6 +215,7 @@ RSpec.describe CallAttempt::CalleGoal do
     call_attempt.sync_calle_goal!(client:, goal_id: "goal_overdue")
 
     expect(call_attempt).to be_in_progress
+    expect(call_attempt.next_action).to be_nil
     expect(call_attempt.completed_at).to be_nil
     expect(call_attempt.raw_result).to include(
       "status" => "queued",
@@ -212,5 +225,28 @@ RSpec.describe CallAttempt::CalleGoal do
         "error_message" => "CALL-E rejected the Goal Run fetch with HTTP 503"
       )
     )
+  end
+
+  it "does not change a persisted decision when synchronization is rerun on a terminal attempt" do
+    response = provider_response(
+      status: "completed",
+      result: {
+        "outcome" => "already_paid",
+        "promise_to_pay_on" => "",
+        "reason" => "",
+        "customer_summary" => "The invoice has been paid."
+      }
+    )
+    sync_with(response)
+    expect(call_attempt).to be_stop
+    expect(call_attempt.next_action_on).to be_nil
+    original_decision = call_attempt.attributes.slice("next_action", "next_action_on")
+    expect(client).not_to receive(:get_goal_run)
+
+    expect do
+      call_attempt.sync_calle_goal!(client:, goal_id: "goal_overdue")
+    end.to raise_error(CallAttempt::InvalidTransitionError)
+
+    expect(call_attempt.reload.attributes.slice("next_action", "next_action_on")).to eq(original_decision)
   end
 end

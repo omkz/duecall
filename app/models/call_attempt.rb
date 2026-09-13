@@ -2,6 +2,7 @@ class CallAttempt < ApplicationRecord
   class InvalidTransitionError < StandardError; end
 
   include CalleGoal
+  include FollowUpDecision
 
   belongs_to :invoice
   belongs_to :contact
@@ -25,6 +26,12 @@ class CallAttempt < ApplicationRecord
     wrong_contact: 8,
     human_followup_required: 9,
     unknown: 10
+  }
+
+  enum :next_action, {
+    stop: 0,
+    retry_call: 1,
+    human_followup: 2
   }
 
   validates :status, presence: true

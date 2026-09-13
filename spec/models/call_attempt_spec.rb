@@ -48,7 +48,7 @@ RSpec.describe CallAttempt, type: :model do
     expect(described_class.new(invoice: invoice, contact: contact, outcome: nil)).to be_valid
   end
 
-  it "supports status and outcome enums" do
+  it "supports status, outcome, and next action enums" do
     expect(described_class.statuses).to eq(
       "pending" => 0,
       "in_progress" => 1,
@@ -67,6 +67,11 @@ RSpec.describe CallAttempt, type: :model do
       "wrong_contact" => 8,
       "human_followup_required" => 9,
       "unknown" => 10
+    )
+    expect(described_class.next_actions).to eq(
+      "stop" => 0,
+      "retry_call" => 1,
+      "human_followup" => 2
     )
 
     call_attempt = described_class.create!(invoice: invoice, contact: contact)

@@ -91,6 +91,16 @@
     <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.promise_to_pay_on&.to_fs(:long) || "Not provided" %></dd>
   </div>
   <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-slate-500">Next action</dt>
+    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.next_action&.humanize || "Not decided" %></dd>
+  </div>
+  <% if @call_attempt.next_action_on.present? %>
+    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+      <dt class="text-sm font-medium text-slate-500">Next action date</dt>
+      <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.next_action_on.to_fs(:long) %></dd>
+    </div>
+  <% end %>
+  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Sentiment</dt>
     <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.sentiment.presence || "Not provided" %></dd>
   </div>

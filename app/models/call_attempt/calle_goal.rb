@@ -59,9 +59,10 @@ module CallAttempt::CalleGoal
   private
     def apply_calle_goal_run!(response)
       attributes = { raw_result: response }
+      result_available = !response["result"].nil?
       attributes[:provider_call_id] = response["call_id"] if response["call_id"].present?
 
-      if !response["result"].nil?
+      if result_available
         attributes.merge!(
           calle_result_attributes(response["result"]),
           status: :completed,
@@ -72,6 +73,7 @@ module CallAttempt::CalleGoal
       end
 
       update!(attributes)
+      decide_next_action! if result_available
     end
 
     def calle_result_attributes(result)
