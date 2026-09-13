@@ -57,7 +57,7 @@ flowchart LR
 ## Safety and guardrails
 
 - Autonomous follow-up is opt-in per invoice.
-- Only overdue, open invoices are eligible for a call.
+- Only overdue, open invoices are eligible for autonomous follow-up.
 - Automatic scheduling respects the contact's configured timezone and
   business hours (weekdays, 9am–5pm local).
 - There is a maximum number of automatic call submissions per invoice.
