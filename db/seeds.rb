@@ -27,7 +27,7 @@ ApplicationRecord.transaction do
   customer.update!(name: customer_name)
 
   contact = customer.contacts.find_or_initialize_by(name: contact_name)
-  contact.update!(name: contact_name, phone_number: demo_phone)
+  contact.update!(name: contact_name, phone_number: demo_phone, time_zone: "Eastern Time (US & Canada)")
 
   invoice = customer.invoices.find_or_initialize_by(number: invoice_number)
   invoice.update!(
@@ -35,14 +35,15 @@ ApplicationRecord.transaction do
     amount_cents: 125_000,
     currency: "USD",
     due_on: Date.new(2026, 9, 1),
-    status: :open
+    status: :open,
+    autonomous_follow_up_enabled: false
   )
 
   puts <<~SUMMARY
     DueCall demo data ready:
       User: #{user.email_address}
       Customer: #{customer.name}
-      Contact: #{contact.name} (#{contact.phone_number})
+      Contact: #{contact.name} (#{contact.phone_number}, #{contact.time_zone})
       Invoice: #{invoice.number} — #{invoice.currency} #{format("%.2f", invoice.amount_cents.fdiv(100))}
       Due date: #{invoice.due_on.iso8601}
   SUMMARY

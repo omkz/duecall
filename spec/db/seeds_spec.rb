@@ -36,12 +36,16 @@ RSpec.describe "db/seeds.rb" do
         customer.invoices.find_by!(number: "INV-DEMO-001").id
       ]
     ).to eq(record_ids)
-    expect(contact.reload.phone_number).to eq("+628123456789")
+    expect(contact.reload).to have_attributes(
+      phone_number: "+628123456789",
+      time_zone: "Eastern Time (US & Canada)"
+    )
     expect(invoice.reload).to have_attributes(
       amount_cents: 125_000,
       currency: "USD",
       due_on: Date.new(2026, 9, 1),
-      status: "open"
+      status: "open",
+      autonomous_follow_up_enabled: false
     )
     expect(CallAttempt.count).to eq(call_attempt_count)
   end
