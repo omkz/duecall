@@ -7,11 +7,12 @@
   <p class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><%= alert %></p>
 <% end %>
 
+<%= turbo_stream_from @call_attempt %>
+
 <div>
   <%= link_to "← #{@invoice.number}", invoice_path(@invoice), class: "text-sm font-medium text-slate-500 hover:text-slate-900" %>
   <div class="mt-3 flex flex-wrap items-center gap-3">
     <h1 class="text-3xl font-bold tracking-tight text-slate-950">Call with <%= @contact.name %></h1>
-    <span class="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700"><%= @call_attempt.status.humanize %></span>
   </div>
   <p class="mt-2 text-sm text-slate-500"><%= @customer.name %> · <%= @invoice.number %></p>
 </div>
@@ -51,89 +52,19 @@
     <dt class="text-sm font-medium text-slate-500">Invoice</dt>
     <dd class="text-sm sm:col-span-2"><%= link_to @invoice.number, @invoice, class: "font-medium text-blue-600 hover:text-blue-500" %></dd>
   </div>
-  <% if @call_attempt.provider_goal_run_id.present? %>
-    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-      <dt class="text-sm font-medium text-slate-500">CALL-E Goal Run ID</dt>
-      <dd class="break-all text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.provider_goal_run_id %></dd>
-    </div>
-  <% end %>
-  <% if @call_attempt.provider_call_id.present? %>
-    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-      <dt class="text-sm font-medium text-slate-500">CALL-E Call ID</dt>
-      <dd class="break-all text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.provider_call_id %></dd>
-    </div>
-  <% end %>
   <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Customer</dt>
     <dd class="text-sm sm:col-span-2"><%= link_to @customer.name, @customer, class: "font-medium text-blue-600 hover:text-blue-500" %></dd>
   </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Contact</dt>
     <dd class="text-sm sm:col-span-2">
       <%= link_to @contact.name, @contact, class: "font-medium text-blue-600 hover:text-blue-500" %>
       <span class="ml-2 text-slate-500"><%= @contact.phone_number %></span>
     </dd>
   </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Status</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.status.humanize %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Outcome</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.outcome&.humanize || "Not available" %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Reason</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.reason.presence || "Not provided" %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Promise to pay</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.promise_to_pay_on&.to_fs(:long) || "Not provided" %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Next action</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.next_action&.humanize || "Not decided" %></dd>
-  </div>
-  <% if @call_attempt.next_action_on.present? %>
-    <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-      <dt class="text-sm font-medium text-slate-500">Next action date</dt>
-      <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.next_action_on.to_fs(:long) %></dd>
-    </div>
-  <% end %>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Autonomous follow-up</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @invoice.autonomous_follow_up_enabled? ? "Enabled" : "Disabled" %></dd>
-  </div>
-  <% if @call_attempt.retry_call? && !@invoice.autonomous_follow_up_enabled? %>
-    <div class="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-      Retry is waiting because autonomous follow-up is disabled for this invoice.
-    </div>
-  <% elsif @call_attempt.human_followup? %>
-    <div class="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-      Human follow-up is required. DueCall will not place another automatic call.
-    </div>
-  <% end %>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Sentiment</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.sentiment.presence || "Not provided" %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Started</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.started_at&.to_fs(:long) || "Not started" %></dd>
-  </div>
-  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Completed</dt>
-    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.completed_at&.to_fs(:long) || "Not completed" %></dd>
-  </div>
-  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-    <dt class="text-sm font-medium text-slate-500">Summary</dt>
-    <dd class="whitespace-pre-wrap text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.summary.presence || "Not provided" %></dd>
-  </div>
 </dl>
 
-<% if @call_attempt.transcript.present? %>
-  <section class="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-    <h2 class="font-semibold text-slate-900">Transcript</h2>
-    <div class="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700"><%= @call_attempt.transcript %></div>
-  </section>
-<% end %>
+<div class="mt-8">
+  <%= render "call_attempts/details", call_attempt: @call_attempt %>
+</div>

@@ -214,6 +214,49 @@ RSpec.describe "Call attempts", type: :request do
     expect(response.body).not_to include("Private call history", "Private contact", "PRIVATE-INV")
   end
 
+  it "subscribes to a Turbo Stream scoped to this specific call attempt" do
+    call_attempt = invoice.call_attempts.create!(contact: contact, status: :in_progress)
+    other_call_attempt = invoice.call_attempts.create!(contact: contact, status: :in_progress)
+
+    get call_attempt_path(call_attempt)
+    expect(response.body).to include("<turbo-cable-stream-source", "signed-stream-name")
+    first_signed_stream_name = response.body[/signed-stream-name="([^"]+)"/, 1]
+
+    get call_attempt_path(other_call_attempt)
+    second_signed_stream_name = response.body[/signed-stream-name="([^"]+)"/, 1]
+
+    expect(first_signed_stream_name).to be_present
+    expect(second_signed_stream_name).to be_present
+    expect(first_signed_stream_name).not_to eq(second_signed_stream_name)
+  end
+
+  it "shows the automatic-update message only while a call is in progress" do
+    in_progress_call = invoice.call_attempts.create!(
+      contact: contact,
+      status: :in_progress,
+      provider_goal_run_id: "rgrp_polling_123"
+    )
+
+    get call_attempt_path(in_progress_call)
+
+    expect(response.body).to include(
+      ActionView::RecordIdentifier.dom_id(in_progress_call, :details),
+      "Waiting for CALL-E result… This page will update automatically."
+    )
+
+    pending_call = invoice.call_attempts.create!(contact: contact, status: :pending)
+    completed_call = invoice.call_attempts.create!(
+      contact: contact, status: :completed, completed_at: Time.current
+    )
+    failed_call = invoice.call_attempts.create!(contact: contact, status: :failed)
+
+    [ pending_call, completed_call, failed_call ].each do |call_attempt|
+      get call_attempt_path(call_attempt)
+
+      expect(response.body).not_to include("Waiting for CALL-E result")
+    end
+  end
+
   it "explains when human follow-up is required" do
     call_attempt = invoice.call_attempts.create!(
       contact:,

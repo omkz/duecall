@@ -96,4 +96,50 @@ RSpec.describe CallAttempt, type: :model do
     expect(contact.destroy).to be(false)
     expect(contact.errors[:base]).to be_present
   end
+
+  describe "real-time broadcasts" do
+    it "broadcasts a replace of its own details region to its own stream when updated" do
+      call_attempt = described_class.create!(invoice: invoice, contact: contact, status: :in_progress)
+      stream_name = call_attempt.to_gid_param
+
+      expect do
+        call_attempt.update!(status: :completed, outcome: :promised_to_pay, completed_at: Time.current)
+      end.to have_broadcasted_to(stream_name)
+
+      payload = ActiveSupport::JSON.decode(ActionCable.server.pubsub.broadcasts(stream_name).last)
+      expect(payload).to include(
+        "<turbo-stream action=\"replace\"",
+        ActionView::RecordIdentifier.dom_id(call_attempt, :details),
+        "Promised to pay"
+      )
+    end
+
+    it "does not broadcast to another call attempt's stream" do
+      call_attempt = described_class.create!(invoice: invoice, contact: contact, status: :in_progress)
+      other_call_attempt = described_class.create!(invoice: invoice, contact: contact, status: :in_progress)
+
+      expect do
+        call_attempt.update!(status: :completed, completed_at: Time.current)
+      end.not_to have_broadcasted_to(other_call_attempt.to_gid_param)
+    end
+
+    it "does not broadcast on create, only on updates to a persisted record" do
+      call_attempt = described_class.create!(invoice: invoice, contact: contact, status: :pending)
+
+      expect(ActionCable.server.pubsub.broadcasts(call_attempt.to_gid_param)).to be_empty
+    end
+
+    it "never includes the raw provider payload in a broadcast" do
+      call_attempt = described_class.create!(invoice: invoice, contact: contact, status: :in_progress)
+      stream_name = call_attempt.to_gid_param
+
+      call_attempt.update!(
+        status: :failed,
+        raw_result: { "submission_error" => { "error_message" => "secret provider diagnostic" } }
+      )
+
+      payload = ActiveSupport::JSON.decode(ActionCable.server.pubsub.broadcasts(stream_name).last)
+      expect(payload).not_to include("secret provider diagnostic", "submission_error")
+    end
+  end
 end

@@ -43,7 +43,16 @@ class CallAttempt < ApplicationRecord
   validate :contact_belongs_to_invoice_customer
   validate :parent_call_attempt_matches
 
+  after_update_commit :broadcast_details_replace
+
   private
+    def broadcast_details_replace
+      broadcast_replace_to self,
+        target: ActionView::RecordIdentifier.dom_id(self, :details),
+        partial: "call_attempts/details",
+        locals: { call_attempt: self }
+    end
+
     def contact_belongs_to_invoice_customer
       return if invoice.blank? || contact.blank?
       return if invoice.customer == contact.customer
