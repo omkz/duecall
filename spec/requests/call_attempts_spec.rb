@@ -53,6 +53,9 @@ RSpec.describe "Call attempts", type: :request do
       "Next action",
       "Retry call",
       (Date.current + 3.days).to_fs(:long),
+      "Autonomous follow-up",
+      "Disabled",
+      "Retry is waiting because autonomous follow-up is disabled for this invoice.",
       "positive",
       "Agent: Hello",
       "rgrp_invoice_123",
@@ -209,5 +212,22 @@ RSpec.describe "Call attempts", type: :request do
 
     get invoice_path(invoice)
     expect(response.body).not_to include("Private call history", "Private contact", "PRIVATE-INV")
+  end
+
+  it "explains when human follow-up is required" do
+    call_attempt = invoice.call_attempts.create!(
+      contact:,
+      status: :completed,
+      outcome: :wrong_contact,
+      next_action: :human_followup,
+      completed_at: Time.current
+    )
+
+    get call_attempt_path(call_attempt)
+
+    expect(response.body).to include(
+      "Human followup",
+      "Human follow-up is required. DueCall will not place another automatic call."
+    )
   end
 end

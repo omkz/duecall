@@ -50,4 +50,42 @@ RSpec.describe Contact, type: :model do
     expect(contact).not_to be_valid
     expect(contact.errors[:customer]).to include("must exist")
   end
+
+  it "accepts a recognized time zone" do
+    expect(build_contact(time_zone: "Asia/Jakarta")).to be_valid
+  end
+
+  it "rejects an unrecognized time zone" do
+    contact = build_contact(time_zone: "Moon/Sea_of_Tranquility")
+
+    expect(contact).not_to be_valid
+    expect(contact.errors[:time_zone]).to include("is not recognized")
+  end
+
+  it "moves a weekend opening to Monday at 09:00 local time" do
+    contact = build_contact(time_zone: "Asia/Jakarta")
+    zone = contact.configured_time_zone
+    saturday = zone.local(2026, 9, 12, 11)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 12), now: saturday))
+      .to eq(zone.local(2026, 9, 14, 9))
+  end
+
+  it "uses 09:00 local time when execution is due before business hours" do
+    contact = build_contact(time_zone: "Asia/Jakarta")
+    zone = contact.configured_time_zone
+    before_opening = zone.local(2026, 9, 14, 8)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now: before_opening))
+      .to eq(zone.local(2026, 9, 14, 9))
+  end
+
+  it "uses the next business day at 09:00 after business hours" do
+    contact = build_contact(time_zone: "Asia/Jakarta")
+    zone = contact.configured_time_zone
+    after_closing = zone.local(2026, 9, 14, 17)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now: after_closing))
+      .to eq(zone.local(2026, 9, 15, 9))
+  end
 end

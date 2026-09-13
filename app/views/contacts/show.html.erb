@@ -20,7 +20,7 @@
     <dt class="text-sm font-medium text-slate-500">Phone number</dt>
     <dd class="text-sm text-slate-900 sm:col-span-2"><%= link_to @contact.phone_number, "tel:#{@contact.phone_number}", class: "font-medium text-blue-600 hover:text-blue-500" %></dd>
   </div>
-  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Email</dt>
     <dd class="text-sm text-slate-900 sm:col-span-2">
       <% if @contact.email.present? %>
@@ -29,6 +29,10 @@
         Not provided
       <% end %>
     </dd>
+  </div>
+  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-slate-500">Time zone</dt>
+    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @contact.time_zone.presence || "Not configured" %></dd>
   </div>
 </dl>
 

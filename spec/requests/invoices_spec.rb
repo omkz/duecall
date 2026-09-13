@@ -1,14 +1,20 @@
 require "rails_helper"
 
 RSpec.describe "Invoices", type: :request do
+  include ActiveJob::TestHelper
+
   let!(:user) { User.create!(email_address: "owner@example.com", password: "password") }
   let!(:other_user) { User.create!(email_address: "other@example.com", password: "password") }
   let!(:customer) { user.customers.create!(name: "Acme") }
   let!(:other_customer) { other_user.customers.create!(name: "Private customer") }
 
   before do
+    ActiveJob::Base.queue_adapter = :test
+    clear_enqueued_jobs
     post session_path, params: { email_address: user.email_address, password: "password" }
   end
+
+  after { clear_enqueued_jobs }
 
   it "allows an authenticated user to CRUD invoices for their customer" do
     get invoices_path
@@ -107,5 +113,52 @@ RSpec.describe "Invoices", type: :request do
     end.not_to change(Invoice, :count)
 
     expect(response).to have_http_status(:not_found)
+  end
+
+  it "explicitly enables and disables autonomy and schedules an existing retry" do
+    invoice = customer.invoices.create!(
+      number: "AUTO-INV",
+      amount_cents: 10_000,
+      due_on: Date.current - 1.day
+    )
+    contact = customer.contacts.create!(
+      name: "Rina",
+      phone_number: "+628123456789",
+      time_zone: "Asia/Jakarta"
+    )
+    call_attempt = invoice.call_attempts.create!(
+      contact:,
+      status: :completed,
+      outcome: :payment_pending,
+      next_action: :retry_call,
+      next_action_on: Date.current + 1.day
+    )
+
+    get invoice_path(invoice)
+    expect(response.body).to include("Autonomous follow-up", "disabled", "Enable autonomous follow-up")
+
+    expect do
+      patch autonomous_follow_up_invoice_path(invoice), params: { enabled: true }
+    end.to have_enqueued_job(CallAttempt::ExecuteFollowUpJob).with(call_attempt)
+
+    expect(response).to redirect_to(invoice_path(invoice))
+    expect(invoice.reload).to be_autonomous_follow_up_enabled
+
+    patch autonomous_follow_up_invoice_path(invoice), params: { enabled: false }
+
+    expect(invoice.reload).not_to be_autonomous_follow_up_enabled
+  end
+
+  it "does not allow autonomy changes on another user's invoice" do
+    invoice = other_customer.invoices.create!(
+      number: "PRIVATE-AUTO",
+      amount_cents: 10_000,
+      due_on: Date.current - 1.day
+    )
+
+    patch autonomous_follow_up_invoice_path(invoice), params: { enabled: true }
+
+    expect(response).to have_http_status(:not_found)
+    expect(invoice.reload).not_to be_autonomous_follow_up_enabled
   end
 end

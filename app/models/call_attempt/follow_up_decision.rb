@@ -7,6 +7,7 @@ module CallAttempt::FollowUpDecision
     return self unless completed? && outcome.present?
 
     update!(follow_up_decision_attributes)
+    schedule_follow_up_execution! if retry_call?
     self
   end
 

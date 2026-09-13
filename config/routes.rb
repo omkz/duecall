@@ -5,6 +5,7 @@ Rails.application.routes.draw do
     post :run, on: :member
   end
   resources :invoices, only: :index do
+    patch :autonomous_follow_up, on: :member
     resources :call_attempts, only: :create
   end
   resources :customers do

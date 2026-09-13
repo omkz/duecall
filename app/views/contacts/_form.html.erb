@@ -33,6 +33,12 @@
     <p class="mt-1.5 text-xs text-slate-500">Optional</p>
   </div>
 
+  <div>
+    <%= form.label :time_zone, "Time zone", class: "block text-sm font-medium text-slate-700" %>
+    <%= form.time_zone_select :time_zone, nil, { include_blank: "Select a time zone" }, class: "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" %>
+    <p class="mt-1.5 text-xs text-slate-500">Required before autonomous calls can be enabled for this contact.</p>
+  </div>
+
   <div class="flex items-center gap-3 border-t border-slate-200 pt-6">
     <%= form.submit class: "cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500" %>
     <%= link_to "Cancel", contact.persisted? ? contact_path(contact) : customer_path(customer), class: "rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950" %>

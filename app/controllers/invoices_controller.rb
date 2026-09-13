@@ -1,6 +1,6 @@
 class InvoicesController < ApplicationController
   before_action :set_customer, only: %i[ new create ]
-  before_action :set_invoice, only: %i[ show edit update destroy ]
+  before_action :set_invoice, only: %i[ show edit update destroy autonomous_follow_up ]
 
   def index
     @invoices = Invoice.where(customer: Current.user.customers)
@@ -42,6 +42,14 @@ class InvoicesController < ApplicationController
     customer = @invoice.customer
     @invoice.destroy!
     redirect_to customer, notice: "Invoice was deleted.", status: :see_other
+  end
+
+  def autonomous_follow_up
+    @invoice.configure_autonomous_follow_up!(enabled: params[:enabled])
+
+    redirect_to @invoice,
+      notice: "Autonomous follow-up was #{@invoice.autonomous_follow_up_enabled? ? "enabled" : "disabled"}.",
+      status: :see_other
   end
 
   private

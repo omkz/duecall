@@ -53,6 +53,7 @@ RSpec.describe Invoice, type: :model do
 
     expect(invoice.currency).to eq("USD")
     expect(invoice).to be_open
+    expect(invoice).not_to be_autonomous_follow_up_enabled
   end
 
   it "requires invoice numbers to be unique per customer" do

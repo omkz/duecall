@@ -101,6 +101,19 @@
     </div>
   <% end %>
   <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-slate-500">Autonomous follow-up</dt>
+    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @invoice.autonomous_follow_up_enabled? ? "Enabled" : "Disabled" %></dd>
+  </div>
+  <% if @call_attempt.retry_call? && !@invoice.autonomous_follow_up_enabled? %>
+    <div class="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+      Retry is waiting because autonomous follow-up is disabled for this invoice.
+    </div>
+  <% elsif @call_attempt.human_followup? %>
+    <div class="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+      Human follow-up is required. DueCall will not place another automatic call.
+    </div>
+  <% end %>
+  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Sentiment</dt>
     <dd class="text-sm text-slate-900 sm:col-span-2"><%= @call_attempt.sentiment.presence || "Not provided" %></dd>
   </div>

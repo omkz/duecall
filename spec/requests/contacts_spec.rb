@@ -25,6 +25,7 @@ RSpec.describe "Contacts", type: :request do
           role: "Finance",
           phone_number: "+628123456789",
           email: "rina@acme.test",
+          time_zone: "Asia/Jakarta",
           customer_id: other_customer.id
         }
       }
@@ -39,17 +40,29 @@ RSpec.describe "Contacts", type: :request do
 
     get contact_path(contact)
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Rina", "Finance", "+628123456789", "rina@acme.test")
+    expect(response.body).to include(
+      "Rina",
+      "Finance",
+      "+628123456789",
+      "rina@acme.test",
+      "Asia/Jakarta"
+    )
 
     get edit_contact_path(contact)
     expect(response).to have_http_status(:ok)
 
     patch contact_path(contact), params: {
-      contact: { name: "Rina Updated", role: "Operations", customer_id: other_customer.id }
+      contact: {
+        name: "Rina Updated",
+        role: "Operations",
+        time_zone: "Singapore",
+        customer_id: other_customer.id
+      }
     }
     expect(response).to redirect_to(contact_path(contact))
     expect(contact.reload.name).to eq("Rina Updated")
     expect(contact.role).to eq("Operations")
+    expect(contact.time_zone).to eq("Singapore")
     expect(contact.customer).to eq(customer)
 
     expect do

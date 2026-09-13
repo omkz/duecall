@@ -3,9 +3,14 @@ class CallAttempt < ApplicationRecord
 
   include CalleGoal
   include FollowUpDecision
+  include AutonomousFollowUp
 
   belongs_to :invoice
   belongs_to :contact
+  belongs_to :parent_call_attempt, class_name: "CallAttempt", optional: true,
+    inverse_of: :follow_up_call_attempt
+  has_one :follow_up_call_attempt, class_name: "CallAttempt", foreign_key: :parent_call_attempt_id,
+    inverse_of: :parent_call_attempt, dependent: :nullify
 
   enum :status, {
     pending: 0,
@@ -36,6 +41,7 @@ class CallAttempt < ApplicationRecord
 
   validates :status, presence: true
   validate :contact_belongs_to_invoice_customer
+  validate :parent_call_attempt_matches
 
   private
     def contact_belongs_to_invoice_customer
@@ -43,5 +49,12 @@ class CallAttempt < ApplicationRecord
       return if invoice.customer == contact.customer
 
       errors.add(:contact, "must belong to the same customer as the invoice")
+    end
+
+    def parent_call_attempt_matches
+      return if parent_call_attempt.blank?
+      return if parent_call_attempt.invoice == invoice && parent_call_attempt.contact == contact
+
+      errors.add(:parent_call_attempt, "must use the same invoice and contact")
     end
 end
