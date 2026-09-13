@@ -161,4 +161,82 @@ RSpec.describe "Invoices", type: :request do
     expect(response).to have_http_status(:not_found)
     expect(invoice.reload).not_to be_autonomous_follow_up_enabled
   end
+
+  describe "dashboard metrics" do
+    def metric_value_for(document, label)
+      label_node = document.css("p").find { |p| p.text.strip == label }
+      label_node.parent.css("p")[1].text.strip
+    end
+
+    it "shows zero-state metrics and no recent call attempts when there is no data" do
+      get invoices_path
+
+      expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML5.parse(response.body)
+
+      [
+        "Overdue invoices",
+        "Calls awaiting result",
+        "Autonomous retries",
+        "Promises to pay",
+        "Human attention required"
+      ].each do |label|
+        expect(metric_value_for(document, label)).to eq("0")
+      end
+
+      expect(response.body).not_to include("Recent call attempts")
+    end
+
+    it "counts each metric independently and lists recent call attempts, scoped to the current user" do
+      contact = customer.contacts.create!(
+        name: "Dana", phone_number: "+15555550100", time_zone: "America/New_York"
+      )
+      overdue_invoice = customer.invoices.create!(
+        number: "M-1", amount_cents: 10_000, due_on: Date.current - 3,
+        autonomous_follow_up_enabled: true
+      )
+      future_invoice = customer.invoices.create!(
+        number: "M-2", amount_cents: 20_000, due_on: Date.current + 10
+      )
+
+      overdue_invoice.call_attempts.create!(contact: contact, status: :in_progress)
+      overdue_invoice.call_attempts.create!(
+        contact: contact, status: :completed, outcome: :payment_pending,
+        next_action: :retry_call, next_action_on: Date.current + 1
+      )
+      future_invoice.call_attempts.create!(
+        contact: contact, status: :completed, outcome: :promised_to_pay,
+        promise_to_pay_on: Date.current + 2
+      )
+      overdue_invoice.call_attempts.create!(
+        contact: contact, status: :completed, outcome: :wrong_contact, next_action: :human_followup
+      )
+      # Not counted as an autonomous retry: autonomous follow-up is disabled on this invoice.
+      future_invoice.call_attempts.create!(
+        contact: contact, status: :completed, outcome: :payment_pending,
+        next_action: :retry_call, next_action_on: Date.current + 1
+      )
+
+      other_contact = other_customer.contacts.create!(
+        name: "Other contact", phone_number: "+15555550199"
+      )
+      other_invoice = other_customer.invoices.create!(
+        number: "PRIVATE-M-1", amount_cents: 5_000, due_on: Date.current - 1
+      )
+      other_invoice.call_attempts.create!(contact: other_contact, status: :in_progress)
+
+      get invoices_path
+      expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML5.parse(response.body)
+
+      expect(metric_value_for(document, "Overdue invoices")).to eq("1")
+      expect(metric_value_for(document, "Calls awaiting result")).to eq("1")
+      expect(metric_value_for(document, "Autonomous retries")).to eq("1")
+      expect(metric_value_for(document, "Promises to pay")).to eq("1")
+      expect(metric_value_for(document, "Human attention required")).to eq("1")
+
+      expect(response.body).to include("Recent call attempts", "Dana", "M-1", "M-2")
+      expect(response.body).not_to include("Other contact", "PRIVATE-M-1")
+    end
+  end
 end

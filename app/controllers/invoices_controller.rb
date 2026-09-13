@@ -3,9 +3,12 @@ class InvoicesController < ApplicationController
   before_action :set_invoice, only: %i[ show edit update destroy autonomous_follow_up ]
 
   def index
-    @invoices = Invoice.where(customer: Current.user.customers)
-      .includes(:customer)
-      .order(:due_on, :number)
+    @invoices = visible_invoices.includes(:customer).order(:due_on, :number)
+    @dashboard_metrics = dashboard_metrics
+    @recent_call_attempts = CallAttempt.where(invoice: visible_invoices)
+      .includes(:contact, invoice: :customer)
+      .order(created_at: :desc)
+      .limit(5)
   end
 
   def show
@@ -53,6 +56,26 @@ class InvoicesController < ApplicationController
   end
 
   private
+    def visible_invoices
+      Invoice.where(customer: Current.user.customers)
+    end
+
+    def dashboard_metrics
+      call_attempts = CallAttempt.where(invoice: visible_invoices)
+
+      {
+        overdue_invoices: visible_invoices.overdue.count,
+        calls_awaiting_result: call_attempts.in_progress.count,
+        autonomous_retries: call_attempts.completed.retry_call
+          .where.not(next_action_on: nil)
+          .joins(:invoice)
+          .where(invoices: { autonomous_follow_up_enabled: true })
+          .count,
+        promises_to_pay: call_attempts.completed.promised_to_pay.count,
+        human_attention_required: call_attempts.human_followup.count
+      }
+    end
+
     def set_customer
       @customer = Current.user.customers.find(params[:customer_id])
     end
