@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_14_130200) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_14_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -41,6 +41,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_14_130200) do
   end
 
   create_table "contacts", force: :cascade do |t|
+    t.time "business_hours_end", default: "2000-01-01 17:00:00", null: false
+    t.time "business_hours_start", default: "2000-01-01 09:00:00", null: false
     t.datetime "created_at", null: false
     t.bigint "customer_id", null: false
     t.string "email"

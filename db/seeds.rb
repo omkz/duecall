@@ -23,7 +23,12 @@ ApplicationRecord.transaction do
   acme.save!
 
   acme_contact = acme.contacts.find_or_initialize_by(name: "Kurnia")
-  acme_contact.update!(phone_number: demo_phone, time_zone: "Eastern Time (US & Canada)")
+  acme_contact.update!(
+    phone_number: demo_phone,
+    time_zone: "Eastern Time (US & Canada)",
+    business_hours_start: "09:00",
+    business_hours_end: "17:00"
+  )
 
   acme_invoice = acme.invoices.find_or_initialize_by(number: "INV-DEMO-001")
   acme_invoice.update!(
@@ -38,7 +43,12 @@ ApplicationRecord.transaction do
   northwind.save!
 
   northwind_contact = northwind.contacts.find_or_initialize_by(name: "Demo Contact")
-  northwind_contact.update!(phone_number: demo_phone, time_zone: "London")
+  northwind_contact.update!(
+    phone_number: demo_phone,
+    time_zone: "London",
+    business_hours_start: "09:00",
+    business_hours_end: "17:00"
+  )
 
   autonomous_invoice = northwind.invoices.find_or_initialize_by(number: "INV-DEMO-002")
   autonomous_invoice.update!(

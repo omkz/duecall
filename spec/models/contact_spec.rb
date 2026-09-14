@@ -62,6 +62,32 @@ RSpec.describe Contact, type: :model do
     expect(contact.errors[:time_zone]).to include("is not recognized")
   end
 
+  it "defaults business hours to 09:00–17:00" do
+    contact = build_contact
+    contact.save!
+
+    expect(contact.business_hours_start.strftime("%H:%M")).to eq("09:00")
+    expect(contact.business_hours_end.strftime("%H:%M")).to eq("17:00")
+  end
+
+  it "requires both business-hours values" do
+    contact = build_contact(business_hours_start: nil, business_hours_end: nil)
+
+    expect(contact).not_to be_valid
+    expect(contact.errors[:business_hours_start]).to include("can't be blank")
+    expect(contact.errors[:business_hours_end]).to include("can't be blank")
+  end
+
+  it "requires business hours to end after they start" do
+    reversed = build_contact(business_hours_start: "17:00", business_hours_end: "09:00")
+    equal = build_contact(business_hours_start: "09:00", business_hours_end: "09:00")
+
+    expect(reversed).not_to be_valid
+    expect(reversed.errors[:business_hours_end]).to include("must be after business hours start")
+    expect(equal).not_to be_valid
+    expect(equal.errors[:business_hours_end]).to include("must be after business hours start")
+  end
+
   it "moves a weekend opening to Monday at 09:00 local time" do
     contact = build_contact(time_zone: "Asia/Jakarta")
     zone = contact.configured_time_zone
@@ -74,18 +100,65 @@ RSpec.describe Contact, type: :model do
   it "uses 09:00 local time when execution is due before business hours" do
     contact = build_contact(time_zone: "Asia/Jakarta")
     zone = contact.configured_time_zone
-    before_opening = zone.local(2026, 9, 14, 8)
+    before_opening = zone.local(2026, 9, 14, 8, 59)
 
     expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now: before_opening))
       .to eq(zone.local(2026, 9, 14, 9))
   end
 
-  it "uses the next business day at 09:00 after business hours" do
+  it "is eligible immediately within business hours" do
     contact = build_contact(time_zone: "Asia/Jakarta")
     zone = contact.configured_time_zone
-    after_closing = zone.local(2026, 9, 14, 17)
+    during_business_hours = zone.local(2026, 9, 14, 13, 15)
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: during_business_hours
+    )).to eq(during_business_hours)
+  end
+
+  it "uses the next business day opening at closing time" do
+    contact = build_contact(time_zone: "Asia/Jakarta")
+    zone = contact.configured_time_zone
+    at_closing = zone.local(2026, 9, 14, 17)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now: at_closing))
+      .to eq(zone.local(2026, 9, 15, 9))
+  end
+
+  it "uses the next business day opening after closing time" do
+    contact = build_contact(time_zone: "Asia/Jakarta")
+    zone = contact.configured_time_zone
+    after_closing = zone.local(2026, 9, 14, 19)
 
     expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now: after_closing))
       .to eq(zone.local(2026, 9, 15, 9))
+  end
+
+  it "uses custom business hours" do
+    contact = build_contact(
+      time_zone: "Asia/Jakarta",
+      business_hours_start: "08:30",
+      business_hours_end: "16:30"
+    )
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 8)
+    )).to eq(zone.local(2026, 9, 14, 8, 30))
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 16, 29)
+    )).to eq(zone.local(2026, 9, 14, 16, 29))
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 16, 30)
+    )).to eq(zone.local(2026, 9, 15, 8, 30))
+  end
+
+  it "interprets business hours in the contact's time zone" do
+    contact = build_contact(time_zone: "America/New_York")
+    zone = contact.configured_time_zone
+    now = Time.utc(2026, 9, 14, 12, 30)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now:))
+      .to eq(zone.local(2026, 9, 14, 9))
   end
 end

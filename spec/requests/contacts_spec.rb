@@ -17,6 +17,10 @@ RSpec.describe "Contacts", type: :request do
 
     get new_customer_contact_path(customer)
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "Calling hours",
+      "Automatic follow-up calls are only placed during these hours in the contact's local time zone."
+    )
 
     expect do
       post customer_contacts_path(customer), params: {
@@ -26,6 +30,8 @@ RSpec.describe "Contacts", type: :request do
           phone_number: "+628123456789",
           email: "rina@acme.test",
           time_zone: "Asia/Jakarta",
+          business_hours_start: "08:30",
+          business_hours_end: "16:30",
           customer_id: other_customer.id
         }
       }
@@ -33,6 +39,8 @@ RSpec.describe "Contacts", type: :request do
 
     contact = customer.contacts.find_by!(name: "Rina")
     expect(contact.customer).to eq(customer)
+    expect(contact.business_hours_start.strftime("%H:%M")).to eq("08:30")
+    expect(contact.business_hours_end.strftime("%H:%M")).to eq("16:30")
     expect(response).to redirect_to(contact_path(contact))
 
     get customer_path(customer)
@@ -56,6 +64,8 @@ RSpec.describe "Contacts", type: :request do
         name: "Rina Updated",
         role: "Operations",
         time_zone: "Singapore",
+        business_hours_start: "09:15",
+        business_hours_end: "17:15",
         customer_id: other_customer.id
       }
     }
@@ -63,6 +73,8 @@ RSpec.describe "Contacts", type: :request do
     expect(contact.reload.name).to eq("Rina Updated")
     expect(contact.role).to eq("Operations")
     expect(contact.time_zone).to eq("Singapore")
+    expect(contact.business_hours_start.strftime("%H:%M")).to eq("09:15")
+    expect(contact.business_hours_end.strftime("%H:%M")).to eq("17:15")
     expect(contact.customer).to eq(customer)
 
     expect do

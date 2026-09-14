@@ -65,6 +65,10 @@ RSpec.describe "db/seeds.rb" do
       phone_number: "+628123456789",
       time_zone: "London"
     )
+    expect(acme_contact.business_hours_start.strftime("%H:%M")).to eq("09:00")
+    expect(acme_contact.business_hours_end.strftime("%H:%M")).to eq("17:00")
+    expect(northwind_contact.business_hours_start.strftime("%H:%M")).to eq("09:00")
+    expect(northwind_contact.business_hours_end.strftime("%H:%M")).to eq("17:00")
     expect(acme_invoice.reload).to have_attributes(
       amount_cents: 125_000,
       currency: "USD",
