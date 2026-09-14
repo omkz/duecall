@@ -19,7 +19,10 @@ RSpec.describe "Contacts", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(
       "Calling hours",
-      "Automatic follow-up calls are only placed during these hours in the contact's local time zone."
+      "Allowed from",
+      "Allowed until",
+      "Preferred call time (optional)",
+      "Automatic retries target this time in the contact's local time zone. Leave blank to call as soon as an eligible retry falls within the allowed calling hours."
     )
 
     expect do
@@ -32,6 +35,7 @@ RSpec.describe "Contacts", type: :request do
           time_zone: "Asia/Jakarta",
           business_hours_start: "08:30",
           business_hours_end: "16:30",
+          preferred_call_time: "14:00",
           customer_id: other_customer.id
         }
       }
@@ -41,6 +45,7 @@ RSpec.describe "Contacts", type: :request do
     expect(contact.customer).to eq(customer)
     expect(contact.business_hours_start.strftime("%H:%M")).to eq("08:30")
     expect(contact.business_hours_end.strftime("%H:%M")).to eq("16:30")
+    expect(contact.preferred_call_time.strftime("%H:%M")).to eq("14:00")
     expect(response).to redirect_to(contact_path(contact))
 
     get customer_path(customer)
@@ -66,6 +71,7 @@ RSpec.describe "Contacts", type: :request do
         time_zone: "Singapore",
         business_hours_start: "09:15",
         business_hours_end: "17:15",
+        preferred_call_time: "15:00",
         customer_id: other_customer.id
       }
     }
@@ -75,6 +81,7 @@ RSpec.describe "Contacts", type: :request do
     expect(contact.time_zone).to eq("Singapore")
     expect(contact.business_hours_start.strftime("%H:%M")).to eq("09:15")
     expect(contact.business_hours_end.strftime("%H:%M")).to eq("17:15")
+    expect(contact.preferred_call_time.strftime("%H:%M")).to eq("15:00")
     expect(contact.customer).to eq(customer)
 
     expect do

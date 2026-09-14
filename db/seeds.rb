@@ -27,7 +27,8 @@ ApplicationRecord.transaction do
     phone_number: demo_phone,
     time_zone: "Eastern Time (US & Canada)",
     business_hours_start: "09:00",
-    business_hours_end: "17:00"
+    business_hours_end: "17:00",
+    preferred_call_time: nil
   )
 
   acme_invoice = acme.invoices.find_or_initialize_by(number: "INV-DEMO-001")
@@ -47,7 +48,8 @@ ApplicationRecord.transaction do
     phone_number: demo_phone,
     time_zone: "London",
     business_hours_start: "09:00",
-    business_hours_end: "17:00"
+    business_hours_end: "17:00",
+    preferred_call_time: "14:00"
   )
 
   autonomous_invoice = northwind.invoices.find_or_initialize_by(number: "INV-DEMO-002")

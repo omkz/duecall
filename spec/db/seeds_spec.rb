@@ -67,8 +67,10 @@ RSpec.describe "db/seeds.rb" do
     )
     expect(acme_contact.business_hours_start.strftime("%H:%M")).to eq("09:00")
     expect(acme_contact.business_hours_end.strftime("%H:%M")).to eq("17:00")
+    expect(acme_contact.preferred_call_time).to be_nil
     expect(northwind_contact.business_hours_start.strftime("%H:%M")).to eq("09:00")
     expect(northwind_contact.business_hours_end.strftime("%H:%M")).to eq("17:00")
+    expect(northwind_contact.preferred_call_time.strftime("%H:%M")).to eq("14:00")
     expect(acme_invoice.reload).to have_attributes(
       amount_cents: 125_000,
       currency: "USD",

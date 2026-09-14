@@ -88,6 +88,33 @@ RSpec.describe Contact, type: :model do
     expect(equal.errors[:business_hours_end]).to include("must be after business hours start")
   end
 
+  it "allows a blank preferred call time" do
+    expect(build_contact(preferred_call_time: nil)).to be_valid
+  end
+
+  it "rejects a preferred call time before opening" do
+    contact = build_contact(preferred_call_time: "08:59")
+
+    expect(contact).not_to be_valid
+    expect(contact.errors[:preferred_call_time]).to include(
+      "must be at or after business hours start and before business hours end"
+    )
+  end
+
+  it "rejects a preferred call time at or after closing" do
+    at_closing = build_contact(preferred_call_time: "17:00")
+    after_closing = build_contact(preferred_call_time: "18:00")
+
+    expect(at_closing).not_to be_valid
+    expect(at_closing.errors[:preferred_call_time]).to include(
+      "must be at or after business hours start and before business hours end"
+    )
+    expect(after_closing).not_to be_valid
+    expect(after_closing.errors[:preferred_call_time]).to include(
+      "must be at or after business hours start and before business hours end"
+    )
+  end
+
   it "moves a weekend opening to Monday at 09:00 local time" do
     contact = build_contact(time_zone: "Asia/Jakarta")
     zone = contact.configured_time_zone
@@ -106,7 +133,7 @@ RSpec.describe Contact, type: :model do
       .to eq(zone.local(2026, 9, 14, 9))
   end
 
-  it "is eligible immediately within business hours" do
+  it "is eligible immediately within business hours when preferred call time is blank" do
     contact = build_contact(time_zone: "Asia/Jakarta")
     zone = contact.configured_time_zone
     during_business_hours = zone.local(2026, 9, 14, 13, 15)
@@ -160,5 +187,80 @@ RSpec.describe Contact, type: :model do
 
     expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now:))
       .to eq(zone.local(2026, 9, 14, 9))
+  end
+
+  it "schedules at the preferred time when it is still in the future" do
+    contact = build_contact(time_zone: "Asia/Jakarta", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 8)
+    )).to eq(zone.local(2026, 9, 14, 14))
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 13, 59)
+    )).to eq(zone.local(2026, 9, 14, 14))
+  end
+
+  it "uses the next weekday when the preferred time is reached or has passed" do
+    contact = build_contact(time_zone: "Asia/Jakarta", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 14)
+    )).to eq(zone.local(2026, 9, 15, 14))
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 15)
+    )).to eq(zone.local(2026, 9, 15, 14))
+  end
+
+  it "uses the next weekday preferred time after allowed closing" do
+    contact = build_contact(time_zone: "Asia/Jakarta", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 18)
+    )).to eq(zone.local(2026, 9, 15, 14))
+  end
+
+  it "rolls a Friday after the preferred time to Monday" do
+    contact = build_contact(time_zone: "Asia/Jakarta", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 18), now: zone.local(2026, 9, 18, 15)
+    )).to eq(zone.local(2026, 9, 21, 14))
+  end
+
+  it "rolls a weekend to Monday at the preferred time" do
+    contact = build_contact(time_zone: "Asia/Jakarta", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 19), now: zone.local(2026, 9, 19, 10)
+    )).to eq(zone.local(2026, 9, 21, 14))
+  end
+
+  it "uses a preferred time within custom allowed hours" do
+    contact = build_contact(
+      time_zone: "Asia/Jakarta",
+      business_hours_start: "08:30",
+      business_hours_end: "16:30",
+      preferred_call_time: "16:00"
+    )
+    zone = contact.configured_time_zone
+
+    expect(contact).to be_valid
+    expect(contact.next_business_opening(
+      on_or_after: Date.new(2026, 9, 14), now: zone.local(2026, 9, 14, 15)
+    )).to eq(zone.local(2026, 9, 14, 16))
+  end
+
+  it "interprets the preferred call time in the contact's time zone" do
+    contact = build_contact(time_zone: "America/New_York", preferred_call_time: "14:00")
+    zone = contact.configured_time_zone
+    now = Time.utc(2026, 9, 14, 17)
+
+    expect(contact.next_business_opening(on_or_after: Date.new(2026, 9, 14), now:))
+      .to eq(zone.local(2026, 9, 14, 14))
   end
 end
