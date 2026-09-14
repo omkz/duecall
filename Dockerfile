@@ -52,8 +52,12 @@ COPY . .
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
-
+RUN SECRET_KEY_BASE_DUMMY=1 \
+    DATABASE_URL=postgresql://localhost/duecall_production \
+    CALLE_API_KEY=build-placeholder \
+    CALLE_OVERDUE_INVOICE_GOAL_ID=build-placeholder \
+    DUECALL_CALLING_COMPANY_NAME=build-placeholder \
+    ./bin/rails assets:precompile
 
 
 
