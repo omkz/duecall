@@ -2,12 +2,15 @@ require "rails_helper"
 
 RSpec.describe "db/seeds.rb" do
   around do |example|
+    original_email = ENV["DUECALL_DEMO_EMAIL"]
     original_phone = ENV["DUECALL_DEMO_PHONE"]
     original_password = ENV["DUECALL_DEMO_PASSWORD"]
+    ENV["DUECALL_DEMO_EMAIL"] = "demo@duecall.test"
     ENV["DUECALL_DEMO_PHONE"] = "+628123456789"
     ENV["DUECALL_DEMO_PASSWORD"] = "demo-test-password"
     example.run
   ensure
+    original_email ? ENV["DUECALL_DEMO_EMAIL"] = original_email : ENV.delete("DUECALL_DEMO_EMAIL")
     original_phone ? ENV["DUECALL_DEMO_PHONE"] = original_phone : ENV.delete("DUECALL_DEMO_PHONE")
     original_password ? ENV["DUECALL_DEMO_PASSWORD"] = original_password : ENV.delete("DUECALL_DEMO_PASSWORD")
   end
@@ -18,7 +21,7 @@ RSpec.describe "db/seeds.rb" do
 
     expect { load Rails.root.join("db/seeds.rb") }.to output(/DueCall demo data ready:/).to_stdout
 
-    user = User.find_by!(email_address: "demo@duecall.local")
+    user = User.find_by!(email_address: "demo@duecall.test")
     customer = user.customers.find_by!(name: "Acme Corporation")
     contact = customer.contacts.find_by!(name: "Kurnia")
     invoice = customer.invoices.find_by!(number: "INV-DEMO-001")
@@ -30,7 +33,7 @@ RSpec.describe "db/seeds.rb" do
     expect([ User.count, Customer.count, Contact.count, Invoice.count ]).to eq(counts)
     expect(
       [
-        User.find_by!(email_address: "demo@duecall.local").id,
+        User.find_by!(email_address: "demo@duecall.test").id,
         user.customers.find_by!(name: "Acme Corporation").id,
         customer.contacts.find_by!(name: "Kurnia").id,
         customer.invoices.find_by!(number: "INV-DEMO-001").id
@@ -66,20 +69,21 @@ RSpec.describe "db/seeds.rb" do
     expect(contact.reload.phone_number).to eq(original_phone)
   end
 
-  it "does not reset the password of an existing demo user" do
+  it "uses the configured email and synchronizes the password of an existing demo user" do
+    ENV["DUECALL_DEMO_EMAIL"] = "configured-demo@duecall.test"
     expect { load Rails.root.join("db/seeds.rb") }.to output.to_stdout
-    user = User.find_by!(email_address: "demo@duecall.local")
+    user = User.find_by!(email_address: "configured-demo@duecall.test")
     user.update!(password: "preserved-password")
     ENV["DUECALL_DEMO_PASSWORD"] = "replacement-password"
 
     expect { load Rails.root.join("db/seeds.rb") }.to output.to_stdout
 
-    expect(user.reload.authenticate("preserved-password")).to eq(user)
-    expect(user.authenticate("replacement-password")).to be(false)
+    expect(user.reload.authenticate("preserved-password")).to be(false)
+    expect(user.authenticate("replacement-password")).to eq(user)
   end
 
-  it "requires an explicit password when creating the demo user in production" do
-    User.find_by(email_address: "demo@duecall.local")&.destroy!
+  it "requires an explicit password when seeding the demo user in production" do
+    user = User.create!(email_address: "demo@duecall.test", password: "existing-password")
     ENV.delete("DUECALL_DEMO_PASSWORD")
     allow(Rails.env).to receive(:production?).and_return(true)
 
@@ -87,9 +91,9 @@ RSpec.describe "db/seeds.rb" do
       load Rails.root.join("db/seeds.rb")
     end.to raise_error(
       RuntimeError,
-      "DUECALL_DEMO_PASSWORD is required when creating the demo user in production"
+      "DUECALL_DEMO_PASSWORD is required when seeding the demo user in production"
     )
 
-    expect(User.exists?(email_address: "demo@duecall.local")).to be(false)
+    expect(user.reload.authenticate("existing-password")).to eq(user)
   end
 end

@@ -1,7 +1,12 @@
-demo_email = "demo@duecall.local"
+demo_email = ENV.fetch("DUECALL_DEMO_EMAIL", "demo@duecall.test")
+demo_password = ENV["DUECALL_DEMO_PASSWORD"].presence
 customer_name = "Acme Corporation"
 contact_name = "Kurnia"
 invoice_number = "INV-DEMO-001"
+
+if demo_password.blank? && Rails.env.production?
+  raise "DUECALL_DEMO_PASSWORD is required when seeding the demo user in production"
+end
 
 demo_phone = ENV["DUECALL_DEMO_PHONE"].presence ||
   Rails.application.credentials.dig(:duecall, :demo_phone)
@@ -13,15 +18,8 @@ end
 
 ApplicationRecord.transaction do
   user = User.find_or_initialize_by(email_address: demo_email)
-  if user.new_record?
-    demo_password = ENV["DUECALL_DEMO_PASSWORD"].presence
-    if demo_password.blank? && Rails.env.production?
-      raise "DUECALL_DEMO_PASSWORD is required when creating the demo user in production"
-    end
-
-    user.password = demo_password || "password123"
-    user.save!
-  end
+  user.password = demo_password || "password123"
+  user.save!
 
   customer = user.customers.find_or_initialize_by(name: customer_name)
   customer.update!(name: customer_name)
