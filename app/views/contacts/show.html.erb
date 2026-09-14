@@ -30,9 +30,17 @@
       <% end %>
     </dd>
   </div>
-  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
     <dt class="text-sm font-medium text-slate-500">Time zone</dt>
     <dd class="text-sm text-slate-900 sm:col-span-2"><%= @contact.time_zone.presence || "Not configured" %></dd>
+  </div>
+  <div class="grid gap-1 border-b border-slate-200 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-slate-500">Allowed calling hours</dt>
+    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @contact.business_hours_start.strftime("%H:%M") %>–<%= @contact.business_hours_end.strftime("%H:%M") %></dd>
+  </div>
+  <div class="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-slate-500">Preferred call time</dt>
+    <dd class="text-sm text-slate-900 sm:col-span-2"><%= @contact.preferred_call_time&.strftime("%H:%M") || "Not configured" %></dd>
   </div>
 </dl>
 

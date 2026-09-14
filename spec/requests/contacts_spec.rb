@@ -58,7 +58,11 @@ RSpec.describe "Contacts", type: :request do
       "Finance",
       "+628123456789",
       "rina@acme.test",
-      "Asia/Jakarta"
+      "Asia/Jakarta",
+      "Allowed calling hours",
+      "08:30–16:30",
+      "Preferred call time",
+      "14:00"
     )
 
     get edit_contact_path(contact)
@@ -88,6 +92,19 @@ RSpec.describe "Contacts", type: :request do
       delete contact_path(contact)
     end.to change(customer.contacts, :count).by(-1)
     expect(response).to redirect_to(customer_path(customer))
+  end
+
+  it "shows when a preferred call time is not configured" do
+    contact = customer.contacts.create!(
+      name: "No preference",
+      phone_number: "+628123456789",
+      time_zone: "Asia/Jakarta"
+    )
+
+    get contact_path(contact)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Preferred call time", "Not configured")
   end
 
   it "does not allow access to or modification of another user's contact" do
